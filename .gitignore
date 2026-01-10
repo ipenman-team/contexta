@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.next/
+out/
+.DS_Store
+.env
+.env.*
+coverage/
+*.log
+*.tsbuildinfo
+plan.md
+prd.md

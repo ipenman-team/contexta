@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: contexta-postgres
+    environment:
+      POSTGRES_USER: contexta
+      POSTGRES_PASSWORD: contexta
+      POSTGRES_DB: contexta
+    ports:
+      - "5432:5432"
+    volumes:
+      - contexta_pgdata:/var/lib/postgresql/data
+
+volumes:
+  contexta_pgdata:
