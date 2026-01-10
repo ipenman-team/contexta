@@ -15,6 +15,7 @@
     "lint:api": "eslint apps/api packages",
     "lint:web": "pnpm -F @contexta/web lint",
     "format": "prettier -w .",
+    "dev": "pnpm dev:web & pnpm dev:api",
     "typecheck": "tsc -b && pnpm -F @contexta/web typecheck",
     "dev:web": "pnpm -F @contexta/web dev",
     "build:web": "pnpm -F @contexta/web build",
@@ -37,4 +38,3 @@
     "typescript": "^5.7.3"
   }
 }
-
