@@ -30,17 +30,30 @@ type MarkFormat = "bold" | "italic" | "underline";
 
 const LIST_TYPES: BlockFormat[] = ["numbered-list", "bulleted-list"];
 
-export function parseContentToSlateValue(content: string | null | undefined): SlateValue {
+export function parseContentToSlateValue(content: unknown): SlateValue {
   if (!content) {
     return [
       {
         type: "paragraph",
         children: [{ text: "" }],
-      } as any,
+      } as unknown as Descendant,
     ];
   }
 
+  if (Array.isArray(content)) {
+    return content as SlateValue;
+  }
+
   try {
+    if (typeof content !== "string") {
+      return [
+        {
+          type: "paragraph",
+          children: [{ text: "" }],
+        } as unknown as Descendant,
+      ];
+    }
+
     const parsed = JSON.parse(content);
     if (Array.isArray(parsed)) {
       return parsed as SlateValue;
@@ -52,8 +65,8 @@ export function parseContentToSlateValue(content: string | null | undefined): Sl
   return [
     {
       type: "paragraph",
-      children: [{ text: content }],
-    } as any,
+      children: [{ text: String(content) }],
+    } as unknown as Descendant,
   ];
 }
 
@@ -63,7 +76,7 @@ export function serializeSlateValue(value: SlateValue): string {
 
 function Leaf(props: RenderLeafProps) {
   const { attributes, children, leaf } = props;
-  const anyLeaf = leaf as any;
+  const anyLeaf = leaf as unknown as { bold?: boolean; italic?: boolean; underline?: boolean };
 
   let next = children;
   if (anyLeaf.bold) next = <strong>{next}</strong>;
@@ -144,7 +157,9 @@ function toggleMark(editor: Editor, format: MarkFormat) {
 function isBlockActive(editor: Editor, format: BlockFormat) {
   const [match] = Editor.nodes(editor, {
     match: (n) =>
-      !Editor.isEditor(n) && SlateElement.isElement(n) && (n as any).type === format,
+      !Editor.isEditor(n) &&
+      SlateElement.isElement(n) &&
+      (n as SlateElement & { type?: string }).type === format,
   });
   return Boolean(match);
 }
@@ -157,19 +172,22 @@ function toggleBlock(editor: Editor, format: BlockFormat) {
     match: (n) =>
       !Editor.isEditor(n) &&
       SlateElement.isElement(n) &&
-      LIST_TYPES.includes(((n as any).type ?? "paragraph") as BlockFormat),
+      LIST_TYPES.includes((((n as SlateElement & { type?: string }).type ?? "paragraph") as BlockFormat)),
     split: true,
   });
 
   const nextType = isActive ? "paragraph" : isList ? "list-item" : format;
-  Transforms.setNodes(editor, { type: nextType } as any, {
+  Transforms.setNodes(editor, { type: nextType } as unknown as Partial<SlateElement>, {
     match: (n) => !Editor.isEditor(n) && SlateElement.isElement(n),
   });
 
   if (!isActive && isList) {
-    const block = { type: format, children: [] } as any;
+    const block = { type: format, children: [] } as unknown as SlateElement;
     Transforms.wrapNodes(editor, block, {
-      match: (n) => !Editor.isEditor(n) && SlateElement.isElement(n) && (n as any).type === "list-item",
+      match: (n) =>
+        !Editor.isEditor(n) &&
+        SlateElement.isElement(n) &&
+        (n as SlateElement & { type?: string }).type === "list-item",
     });
   }
 }
@@ -197,6 +215,8 @@ function EditorToolbar(props: { disabled?: boolean }) {
   const editor = useSlate();
   const disabled = props.disabled;
 
+  const history = editor as unknown as { undo?: () => void; redo?: () => void };
+
   return (
     <div
       className={cn(
@@ -209,7 +229,7 @@ function EditorToolbar(props: { disabled?: boolean }) {
         disabled={disabled}
         onMouseDown={(e) => {
           e.preventDefault();
-          (editor as any).undo?.();
+          history.undo?.();
         }}
       />
       <ToolbarButton
@@ -217,7 +237,7 @@ function EditorToolbar(props: { disabled?: boolean }) {
         disabled={disabled}
         onMouseDown={(e) => {
           e.preventDefault();
-          (editor as any).redo?.();
+          history.redo?.();
         }}
       />
 
@@ -311,8 +331,12 @@ export function SlateEditor(props: {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  readOnly?: boolean;
+  showToolbar?: boolean;
 }) {
   const editor = useMemo(() => withHistory(withReact(createEditor())), []);
+  const showToolbar = props.showToolbar ?? true;
+  const readOnly = Boolean(props.readOnly ?? false);
 
   const renderLeaf = useCallback((leafProps: RenderLeafProps) => {
     return <Leaf {...leafProps} />;
@@ -328,7 +352,7 @@ export function SlateEditor(props: {
       initialValue={props.value}
       onChange={(nextValue) => props.onChange(nextValue)}
     >
-      <EditorToolbar disabled={props.disabled} />
+      {showToolbar ? <EditorToolbar disabled={props.disabled || readOnly} /> : null}
       <Editable
         className={cn(
           "min-h-[45vh] w-full rounded-md bg-background px-1 py-2 text-[15px] leading-7",
@@ -339,7 +363,7 @@ export function SlateEditor(props: {
         placeholder={props.placeholder}
         renderElement={renderElement}
         renderLeaf={renderLeaf}
-        readOnly={props.disabled}
+        readOnly={props.disabled || readOnly}
         onKeyDown={(e) => {
           const isMod = e.metaKey || e.ctrlKey;
           if (!isMod) return;

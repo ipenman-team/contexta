@@ -21,6 +21,7 @@ export const apiClient = axios.create({
   baseURL: getApiBaseUrl(),
   headers: {
     'content-type': 'application/json',
+    'x-user-id': (process.env.NEXT_PUBLIC_USER_ID ?? 'demo').toString(),
   },
 });
 

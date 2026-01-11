@@ -7,19 +7,58 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum PageVersionStatus {
+  DRAFT
+  TEMP
+  PUBLISHED
+}
+
 model Page {
   id       String @id @default(cuid())
   tenantId String @map("tenant_id")
 
   title   String
-  content String @default("")
+  content Json   @db.JsonB
 
   parentIds String[] @default([]) @map("parent_ids")
+
+  createdBy String @map("created_by")
+  updatedBy String @map("updated_by")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  versions PageVersion[]
+
   @@index([id])
   @@index([tenantId])
   @@map("pages")
+}
+
+model PageVersion {
+  id       String @id @default(cuid())
+  tenantId String @map("tenant_id")
+  pageId   String @map("page_id")
+
+  status PageVersionStatus
+
+  title     String
+  content   Json   @db.JsonB
+  parentIds String[] @default([]) @map("parent_ids")
+
+  createdBy String @map("created_by")
+  updatedBy String @map("updated_by")
+
+  isDeleted Boolean @default(false) @map("is_deleted")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([id])
+  @@index([tenantId])
+  @@index([pageId])
+  @@index([pageId, createdAt])
+  @@index([pageId, status])
+  @@map("page_versions")
 }

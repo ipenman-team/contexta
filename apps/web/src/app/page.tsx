@@ -20,6 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { pagesApi, type PageDto } from "@/lib/api";
 import { buildPageTreeFromFlatPages } from "@contexta/shared";
+import type { PageVersionDto, PageVersionStatus } from "@/lib/api/pages/types";
 
 type ViewId = "dashboard" | "notion-ai" | "settings";
 
@@ -62,7 +63,16 @@ export default function Home() {
     id: "dashboard",
   });
 
+  const selectedPageId = selected.kind === "page" ? selected.id : null;
+
   const [activePage, setActivePage] = useState<PageDto | null>(null);
+  const [pageMode, setPageMode] = useState<"edit" | "preview">("preview");
+  const [publishedSnapshot, setPublishedSnapshot] = useState<{
+    title: string;
+    content: unknown;
+    updatedBy: string;
+    updatedAt: string;
+  } | null>(null);
   const [pageLoading, setPageLoading] = useState(false);
   const [pageTitle, setPageTitle] = useState("");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
@@ -70,7 +80,10 @@ export default function Home() {
     parseContentToSlateValue(""),
   );
   const [pageSaving, setPageSaving] = useState(false);
-  const lastSavedRef = useRef<{ id: string; title: string; content: string } | null>(null);
+  const [pagePublishing, setPagePublishing] = useState(false);
+  const [pageVersions, setPageVersions] = useState<PageVersionDto[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const lastSavedRef = useRef<{ id: string; title: string; contentKey: string } | null>(null);
 
   function formatTime(value: string | Date) {
     const date = typeof value === "string" ? new Date(value) : value;
@@ -80,6 +93,15 @@ export default function Home() {
       minute: "2-digit",
       second: "2-digit",
     });
+  }
+
+  function formatYmd(value: string | Date) {
+    const date = typeof value === "string" ? new Date(value) : value;
+    if (Number.isNaN(date.getTime())) return "";
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
   }
 
   const dashboardCards = [
@@ -115,9 +137,12 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (selected.kind !== "page") {
+    if (!selectedPageId) {
       setActivePage(null);
       setLastSavedAt(null);
+      setPageVersions([]);
+      setPublishedSnapshot(null);
+      setPageMode("preview");
       return;
     }
 
@@ -126,17 +151,34 @@ export default function Home() {
 
     (async () => {
       try {
-        const page = await pagesApi.get(selected.id);
+        const page = await pagesApi.get(selectedPageId);
         if (cancelled) return;
         setActivePage(page);
+        setPageMode("preview");
+        setPublishedSnapshot(null);
         setPageTitle(page.title);
         setLastSavedAt(formatTime(page.updatedAt));
-        setEditorValue(parseContentToSlateValue(page.content));
+        const loadedValue = parseContentToSlateValue(page.content);
+        setEditorValue(loadedValue);
         lastSavedRef.current = {
           id: page.id,
           title: page.title,
-          content: page.content,
+          contentKey: serializeSlateValue(loadedValue),
         };
+
+        // 默认进入预览：优先展示最新已发布内容。
+        try {
+          const published = await pagesApi.getLatestPublished(page.id);
+          if (cancelled) return;
+          setPublishedSnapshot({
+            title: published.title,
+            content: published.content,
+            updatedBy: published.updatedBy,
+            updatedAt: published.updatedAt,
+          });
+        } catch {
+          // 没有已发布版本时保持 preview，但不额外做 UI。
+        }
       } finally {
         if (cancelled) return;
         setPageLoading(false);
@@ -146,19 +188,56 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [selected.kind, selected.kind === "page" ? selected.id : null]);
-
-  const editorContentString = useMemo(() => serializeSlateValue(editorValue), [editorValue]);
+  }, [selectedPageId]);
 
   useEffect(() => {
+    if (pageMode !== "edit") return;
+    if (!activePage) return;
+
+    let cancelled = false;
+    setVersionsLoading(true);
+
+    (async () => {
+      try {
+        const versions = await pagesApi.listVersions(activePage.id);
+        if (cancelled) return;
+        setPageVersions(versions);
+      } finally {
+        if (cancelled) return;
+        setVersionsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activePage, pageMode]);
+
+  function statusLabel(status: PageVersionStatus) {
+    switch (status) {
+      case "DRAFT":
+        return "草稿";
+      case "TEMP":
+        return "临时";
+      case "PUBLISHED":
+        return "已发布";
+      default:
+        return status;
+    }
+  }
+
+  const editorContentKey = useMemo(() => serializeSlateValue(editorValue), [editorValue]);
+
+  useEffect(() => {
+    if (pageMode !== "edit") return;
     if (!activePage) return;
 
     const currentId = activePage.id;
     const nextTitle = pageTitle.trim() || "无标题文档";
-    const nextContent = editorContentString;
+    const nextContentKey = editorContentKey;
     const lastSaved = lastSavedRef.current;
 
-    if (lastSaved?.id === currentId && lastSaved.title === nextTitle && lastSaved.content === nextContent) {
+    if (lastSaved?.id === currentId && lastSaved.title === nextTitle && lastSaved.contentKey === nextContentKey) {
       return;
     }
 
@@ -167,15 +246,17 @@ export default function Home() {
         setPageSaving(true);
         const saved = await pagesApi.save(currentId, {
           title: nextTitle,
-          content: nextContent,
+          content: editorValue,
         });
 
         setLastSavedAt(formatTime(saved.updatedAt));
 
+        const savedValue = parseContentToSlateValue(saved.content);
+
         lastSavedRef.current = {
           id: saved.id,
           title: saved.title,
-          content: saved.content,
+          contentKey: serializeSlateValue(savedValue),
         };
 
         setActivePage(saved);
@@ -192,7 +273,7 @@ export default function Home() {
     return () => {
       window.clearTimeout(handle);
     };
-  }, [activePage, pageTitle, editorContentString, selected]);
+  }, [activePage, pageMode, pageTitle, editorContentKey, editorValue, selected]);
 
   useEffect(() => {
     if (!openMenuNodeId) return;
@@ -347,31 +428,90 @@ export default function Home() {
     }
 
     if (selected.kind === "page") {
+      const isPreview = pageMode === "preview";
+      const previewTitle = publishedSnapshot?.title ?? pageTitle;
+      const previewValue = isPreview
+        ? (publishedSnapshot ? parseContentToSlateValue(publishedSnapshot.content) : editorValue)
+        : editorValue;
+
+      const previewEditorKey = `${activePage?.id ?? selected.id}-preview-${activePage ? "loaded" : "loading"}-${publishedSnapshot?.updatedAt ?? "none"}`;
+      const editEditorKey = `${activePage?.id ?? selected.id}-edit`;
+
       return (
         <div className="mx-auto w-full max-w-5xl space-y-4 pt-6">
           <div className="space-y-2">
-            <input
-              className={cn(
-                "w-full bg-transparent text-5xl font-bold tracking-tight",
-                "placeholder:text-muted-foreground/40",
-                "focus-visible:outline-none",
-              )}
-              placeholder="请输入标题"
-              value={pageTitle}
-              disabled={pageLoading}
-              onChange={(e) => setPageTitle(e.target.value)}
-            />
+            {isPreview ? (
+              <div className="text-5xl font-bold tracking-tight">
+                {previewTitle.trim() || "无标题文档"}
+              </div>
+            ) : (
+              <input
+                className={cn(
+                  "w-full bg-transparent text-5xl font-bold tracking-tight",
+                  "placeholder:text-muted-foreground/40",
+                  "focus-visible:outline-none",
+                )}
+                placeholder="请输入标题"
+                value={pageTitle}
+                disabled={pageLoading}
+                onChange={(e) => setPageTitle(e.target.value)}
+              />
+            )}
           </div>
 
           <div className="pt-2">
             <SlateEditor
-              key={activePage?.id ?? selected.id}
-              value={editorValue}
+              key={isPreview ? previewEditorKey : editEditorKey}
+              value={previewValue}
               onChange={setEditorValue}
               disabled={pageLoading}
-              placeholder="直接输入正文…"
+              readOnly={isPreview}
+              showToolbar={!isPreview}
+              placeholder={isPreview ? undefined : "直接输入正文…"}
             />
           </div>
+
+          {!isPreview ? (
+            <Card>
+              <CardHeader className="p-4">
+                <CardTitle className="text-sm">版本历史</CardTitle>
+                <CardDescription className="text-xs">
+                  {versionsLoading
+                    ? "加载中…"
+                    : pageVersions.length
+                      ? `共 ${pageVersions.length} 条`
+                      : "暂无版本"}
+                </CardDescription>
+              </CardHeader>
+
+              {pageVersions.length ? (
+                <div className="space-y-2 px-4 pb-4">
+                  {pageVersions.map((v) => (
+                    <div
+                      key={v.id}
+                      className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate font-medium">
+                          {statusLabel(v.status)} · {v.title || "无标题文档"}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatTime(v.createdAt)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </Card>
+          ) : null}
+
+          {isPreview && publishedSnapshot ? (
+            <div className="pt-2 text-sm text-muted-foreground">
+              最后更新人：{publishedSnapshot.updatedBy || "-"} · 更新时间：
+              {formatYmd(publishedSnapshot.updatedAt)}
+            </div>
+          ) : null}
         </div>
       );
     }
@@ -602,22 +742,77 @@ export default function Home() {
             <div className="flex h-12 items-center justify-between px-6 lg:px-11">
               <div className="flex min-w-0 items-center">
                 <div className="truncate text-sm font-medium">
-                  {pageTitle.trim() || "无标题文档"}
+                  {(pageMode === "preview" ? publishedSnapshot?.title : pageTitle)?.trim() ||
+                    "无标题文档"}
                 </div>
-                <div className="ml-3 shrink-0 text-xs text-muted-foreground">
-                  {pageLoading
-                    ? "加载中…"
-                    : pageSaving
-                      ? "保存中…"
-                      : lastSavedAt
-                        ? `已保存 ${lastSavedAt}`
-                        : ""}
-                </div>
+                {pageMode === "edit" ? (
+                  <div className="ml-3 shrink-0 text-xs text-muted-foreground">
+                    {pageLoading
+                      ? "加载中…"
+                      : pageSaving
+                        ? "保存中…"
+                        : lastSavedAt
+                          ? `已保存 ${lastSavedAt}`
+                          : ""}
+                  </div>
+                ) : null}
               </div>
 
-              <Button type="button" variant="default" size="sm">
-                保存
-              </Button>
+              {pageMode === "edit" ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={pagePublishing}
+                    aria-label="关闭"
+                    onClick={async () => {
+                      if (!activePage) return;
+                      setPageMode("preview");
+                    }}
+                  >
+                    ×
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    disabled={pageLoading || pageSaving || pagePublishing || !activePage}
+                    onClick={async () => {
+                      if (!activePage || pagePublishing) return;
+                      try {
+                        setPagePublishing(true);
+                        await pagesApi.publish(activePage.id);
+                        const published = await pagesApi.getLatestPublished(activePage.id);
+                        setPublishedSnapshot({
+                          title: published.title,
+                          content: published.content,
+                          updatedBy: published.updatedBy,
+                          updatedAt: published.updatedAt,
+                        });
+                        setPageMode("preview");
+                      } finally {
+                        setPagePublishing(false);
+                      }
+                    }}
+                  >
+                    发布
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!activePage}
+                  onClick={() => {
+                    setPageMode("edit");
+                  }}
+                >
+                  编辑
+                </Button>
+              )}
             </div>
           </div>
         ) : null}

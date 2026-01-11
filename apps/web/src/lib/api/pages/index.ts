@@ -1,5 +1,11 @@
 import { apiClient } from '../client';
-import type { CreatePageInput, PageDto, SavePageInput } from './types';
+import type {
+  CreatePageInput,
+  PageDto,
+  PageVersionDto,
+  PublishedPageDto,
+  SavePageInput,
+} from './types';
 
 export const pagesApi = {
   async list() {
@@ -19,6 +25,27 @@ export const pagesApi = {
 
   async save(id: string, input: SavePageInput) {
     const res = await apiClient.put<PageDto>(`/pages/${encodeURIComponent(id)}`, input);
+    return res.data;
+  },
+
+  async publish(id: string) {
+    const res = await apiClient.post<{ ok: true; versionId: string }>(
+      `/pages/${encodeURIComponent(id)}/publish`,
+    );
+    return res.data;
+  },
+
+  async listVersions(id: string) {
+    const res = await apiClient.get<PageVersionDto[]>(
+      `/pages/${encodeURIComponent(id)}/versions`,
+    );
+    return res.data;
+  },
+
+  async getLatestPublished(id: string) {
+    const res = await apiClient.get<PublishedPageDto>(
+      `/pages/${encodeURIComponent(id)}/published`,
+    );
     return res.data;
   },
 
