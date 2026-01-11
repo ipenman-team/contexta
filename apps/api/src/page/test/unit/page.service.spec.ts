@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../prisma/prisma.service';
+import type { PageDto } from '../../dto/page.dto';
 import { PageService } from '../../page.service';
 
 describe('PageService', () => {
@@ -16,7 +17,7 @@ describe('PageService', () => {
     },
   };
 
-  const samplePage = (overrides?: Partial<any>) => {
+  const samplePage = (overrides?: Partial<PageDto>): PageDto => {
     const now = new Date('2026-01-11T00:00:00.000Z');
     return {
       id: 'p1',
