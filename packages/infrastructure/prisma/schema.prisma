@@ -6,3 +6,20 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model Page {
+  id       String @id @default(cuid())
+  tenantId String @map("tenant_id")
+
+  title   String
+  content String @default("")
+
+  parentIds String[] @default([]) @map("parent_ids")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([id])
+  @@index([tenantId])
+  @@map("pages")
+}

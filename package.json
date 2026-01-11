@@ -22,8 +22,8 @@
     "start:web": "pnpm -F @contexta/web start",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
-    "prisma:generate": "pnpm -F @contexta/infrastructure prisma:generate",
-    "prisma:migrate": "pnpm -F @contexta/infrastructure prisma:migrate",
+    "prisma:generate": "pnpm -F @contexta/infrastructure prisma:generate:local",
+    "prisma:migrate": "pnpm -F @contexta/infrastructure prisma:migrate:local",
     "dev:api": "pnpm -F @contexta/api start:dev",
     "build": "pnpm -F @contexta/api build",
     "start": "pnpm -F @contexta/api start:prod"

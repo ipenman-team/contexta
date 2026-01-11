@@ -8,6 +8,5 @@ out/
 coverage/
 *.log
 *.tsbuildinfo
-plan.md
-prd.md
+plan*.md
 .github/agents/*.agent.md
