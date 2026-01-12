@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
@@ -53,7 +53,7 @@ export function ImportPageModal(props: {
   onOpenChange: (open: boolean) => void;
   onPickMarkdownFile: (file: File) => void;
 }) {
-  const [selected, setSelected] = useState<ImportType | null>(null);
+  const [selected, setSelected] = useState<ImportType | null>("markdown");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const options: ImportOption[] = useMemo(
@@ -76,16 +76,14 @@ export function ImportPageModal(props: {
     [],
   );
 
-  useEffect(() => {
-    if (!props.open) return;
-    setSelected("markdown");
-  }, [props.open]);
-
   return (
     <Modal
       open={props.open}
       title="导入页面"
-      onOpenChange={props.onOpenChange}
+      onOpenChange={(open) => {
+        if (open) setSelected("markdown");
+        props.onOpenChange(open);
+      }}
       footer={null}
     >
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

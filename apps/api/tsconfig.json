@@ -13,7 +13,8 @@
     { "path": "../../packages/shared" },
     { "path": "../../packages/domain" },
     { "path": "../../packages/application" },
-    { "path": "../../packages/infrastructure" }
+    { "path": "../../packages/infrastructure" },
+    { "path": "../../packages/slate-converters" }
   ],
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "test"]

@@ -8,6 +8,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { TenantId } from '../common/tenant/tenant-id.decorator';
 import type { ImportRequest } from './imports.types';
 import { ImportsService } from './imports.service';
@@ -16,8 +17,17 @@ import { ImportsService } from './imports.service';
 export class ImportsController {
   constructor(private readonly importsService: ImportsService) {}
 
+  private static readonly MAX_FILE_SIZE_BYTES = Number(
+    process.env.IMPORT_MAX_FILE_SIZE_BYTES ?? 10 * 1024 * 1024,
+  );
+
   @Post()
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: ImportsController.MAX_FILE_SIZE_BYTES, files: 1 },
+    }),
+  )
   async create(
     @TenantId() tenantId: string,
     @Headers('x-user-id') userId: string | undefined,

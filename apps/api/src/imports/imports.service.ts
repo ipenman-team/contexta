@@ -3,7 +3,8 @@ import { TaskStatus, TaskType } from '@prisma/client';
 import { PageService } from '../page/page.service';
 import { TaskRuntimeService } from '../task/task.runtime.service';
 import { TaskService } from '../task/task.service';
-import { fileNameToTitle, markdownToSlateValue, parseParentIds } from './imports.utils';
+import { markdownToSlateValue } from '@contexta/slate-converters';
+import { fileNameToTitle, parseParentIds } from './imports.utils';
 import type { ImportRequest } from './imports.types';
 import * as fs from 'node:fs/promises';
 
@@ -86,10 +87,13 @@ export class ImportsService {
         args.userId,
       );
 
+      await this.taskService.updateProgress(args.tenantId, args.taskId, 90, 'Publishing page');
+      const published = await this.pageService.publish(args.tenantId, created.id, args.userId);
+
       await this.taskService.succeed(
         args.tenantId,
         args.taskId,
-        { pageId: created.id },
+        { pageId: created.id, versionId: published.versionId },
         'Completed',
       );
     } catch (error) {
@@ -109,7 +113,17 @@ export class ImportsService {
 
   private async readFileText(file: UploadedFile): Promise<string> {
     if (file.buffer) return file.buffer.toString('utf-8');
-    if (file.path) return fs.readFile(file.path, 'utf-8');
+    if (file.path) {
+      try {
+        return await fs.readFile(file.path, 'utf-8');
+      } finally {
+        try {
+          await fs.unlink(file.path);
+        } catch {
+          // ignore
+        }
+      }
+    }
     throw new BadRequestException('file content is empty');
   }
 }

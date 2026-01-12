@@ -1,4 +1,6 @@
-import { Controller, Get, Headers, Param, Post } from '@nestjs/common';
+import { Controller, Get, Headers, Param, Post, Sse } from '@nestjs/common';
+import type { MessageEvent } from '@nestjs/common';
+import { concat, from, map, type Observable } from 'rxjs';
 import { TenantId } from '../common/tenant/tenant-id.decorator';
 import { TaskRuntimeService } from './task.runtime.service';
 import { TaskService } from './task.service';
@@ -13,6 +15,16 @@ export class TaskController {
   @Get(':id')
   get(@TenantId() tenantId: string, @Param('id') id: string) {
     return this.taskService.get(tenantId, id);
+  }
+
+  @Sse(':id/events')
+  events(@TenantId() tenantId: string, @Param('id') id: string): Observable<MessageEvent> {
+    const initial$ = from(this.taskService.get(tenantId, id));
+    const updates$ = this.taskRuntime.observe(id);
+
+    return concat(initial$, updates$).pipe(
+      map((task) => ({ data: task })),
+    );
   }
 
   @Post(':id/cancel')

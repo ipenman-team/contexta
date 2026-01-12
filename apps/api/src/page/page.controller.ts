@@ -37,7 +37,7 @@ export class PageController {
   }
 
   @Get(':id/published')
-  getLatestPublished(@Param('id') id: string, @TenantId() tenantId: string) {
+  getLatestPublished(@TenantId() tenantId: string, @Param('id') id: string) {
     return this.pageService.getLatestPublished(id, tenantId);
   }
 

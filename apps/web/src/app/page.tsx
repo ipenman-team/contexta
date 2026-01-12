@@ -7,11 +7,11 @@ import type { TreeNode } from "@/components/common/tree";
 import {
   parseContentToSlateValue,
   serializeSlateValue,
-  markdownToSlateValue,
   type SlateValue,
 } from "@/components/common/slate-editor";
 import { cn } from "@/lib/utils";
-import { pagesApi, type PageDto } from "@/lib/api";
+import { importsApi, pagesApi, tasksApi, type ApiTaskDto, type PageDto } from "@/lib/api";
+import { getApiBaseUrl } from "@/lib/api/client";
 import { buildPageTreeFromFlatPages } from "@contexta/shared";
 import type { PageVersionDto, PageVersionStatus } from "@/lib/api/pages/types";
 
@@ -118,8 +118,9 @@ export function HomeScreen(props: {
   const [openPageMore, setOpenPageMore] = useState(false);
   const [openImportModal, setOpenImportModal] = useState(false);
   const [tasks, setTasks] = useState<ProgressTask[]>([]);
-  const taskControllersRef = useRef<Map<string, AbortController>>(new Map());
-  const taskIntervalsRef = useRef<Map<string, number>>(new Map());
+  const taskRuntimeRef = useRef<
+    Map<string, { upload?: AbortController; sse?: EventSource }>
+  >(new Map());
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
   const [deletingPage, setDeletingPage] = useState(false);
   const [renamingTarget, setRenamingTarget] = useState<{ id: string; title: string } | null>(null);
@@ -154,22 +155,107 @@ export function HomeScreen(props: {
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...patch } : t)));
   }
 
-  function clearTaskTimer(taskId: string) {
-    const handle = taskIntervalsRef.current.get(taskId);
-    if (handle) {
-      window.clearInterval(handle);
-      taskIntervalsRef.current.delete(taskId);
+  function replaceTaskId(oldId: string, newId: string) {
+    setTasks((prev) => prev.map((t) => (t.id === oldId ? { ...t, id: newId } : t)));
+
+    const runtime = taskRuntimeRef.current.get(oldId);
+    if (runtime) {
+      taskRuntimeRef.current.delete(oldId);
+      taskRuntimeRef.current.set(newId, runtime);
     }
   }
 
+  function closeTaskSse(taskId: string) {
+    const runtime = taskRuntimeRef.current.get(taskId);
+    runtime?.sse?.close();
+    if (runtime) {
+      delete runtime.sse;
+    }
+  }
+
+  function cleanupTaskRuntime(taskId: string) {
+    const runtime = taskRuntimeRef.current.get(taskId);
+    runtime?.upload?.abort();
+    runtime?.sse?.close();
+    taskRuntimeRef.current.delete(taskId);
+  }
+
+  function mapApiStatus(status: ApiTaskDto["status"]): ProgressTask["status"] {
+    switch (status) {
+      case "PENDING":
+      case "RUNNING":
+        return "running";
+      case "SUCCEEDED":
+        return "success";
+      case "CANCELLED":
+        return "cancelled";
+      case "FAILED":
+      default:
+        return "error";
+    }
+  }
+
+  function extractPageIdFromResult(result: unknown): string | undefined {
+    if (!result || typeof result !== "object") return undefined;
+    if (!("pageId" in result)) return undefined;
+    const value = (result as { pageId?: unknown }).pageId;
+    return typeof value === "string" ? value : undefined;
+  }
+
+  function subscribeTaskEvents(taskId: string) {
+    const url = `${getApiBaseUrl()}/tasks/${encodeURIComponent(taskId)}/events`;
+    const es = new EventSource(url);
+
+    const runtime = taskRuntimeRef.current.get(taskId) ?? {};
+    runtime.sse = es;
+    taskRuntimeRef.current.set(taskId, runtime);
+
+    es.onmessage = (evt) => {
+      try {
+        const apiTask = JSON.parse(evt.data) as ApiTaskDto;
+        const nextStatus = mapApiStatus(apiTask.status);
+        const nextProgress = Math.max(0, Math.min(100, Math.trunc(apiTask.progress ?? 0)));
+        const pageId = extractPageIdFromResult(apiTask.result);
+
+        setTasks((prev) =>
+          prev.map((t) => {
+            if (t.id !== taskId) return t;
+            return {
+              ...t,
+              progress: Math.max(t.progress, nextProgress),
+              status: nextStatus,
+              pageId: pageId ?? t.pageId,
+            };
+          }),
+        );
+
+        if (apiTask.status === "SUCCEEDED" && pageId) {
+          void refreshPages();
+        }
+
+        if (apiTask.status === "SUCCEEDED" || apiTask.status === "FAILED" || apiTask.status === "CANCELLED") {
+          closeTaskSse(taskId);
+        }
+      } catch {
+        // ignore malformed SSE payload
+      }
+    };
+
+    es.onerror = () => {
+      // 连接失败/断开时：标记失败并关闭连接，避免无限重连造成噪音。
+      updateTask(taskId, { status: "error" });
+      closeTaskSse(taskId);
+    };
+  }
+
   async function startImportMarkdown(file: File) {
-    const taskId = createTaskId();
-    const controller = new AbortController();
-    taskControllersRef.current.set(taskId, controller);
+    const localId = createTaskId();
+    const upload = new AbortController();
+    taskRuntimeRef.current.set(localId, { upload });
 
     setTasks((prev) => [
       {
-        id: taskId,
+        id: localId,
         label: file.name,
         progress: 0,
         status: "running",
@@ -177,61 +263,53 @@ export function HomeScreen(props: {
       ...prev,
     ]);
 
-    const interval = window.setInterval(() => {
-      setTasks((prev) =>
-        prev.map((t) => {
-          if (t.id !== taskId) return t;
-          if (t.status !== "running") return t;
-          return { ...t, progress: Math.min(90, t.progress + 8) };
-        }),
-      );
-    }, 180);
-    taskIntervalsRef.current.set(taskId, interval);
-
     try {
       const title = stripFileExt(file.name);
-      const text = await file.text();
-      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
 
-      const content = markdownToSlateValue(text);
-
-      const created = await pagesApi.createWithOptions(
+      const res = await importsApi.createMarkdown(
+        { file, title },
         {
-          title,
-          content,
+          signal: upload.signal,
+          onUploadProgress: (pct) => {
+            // 仅展示上传阶段的进度（0-20），后续由后端 SSE 驱动。
+            updateTask(localId, { progress: Math.round((pct / 100) * 20) });
+          },
         },
-        { signal: controller.signal },
       );
 
-      clearTaskTimer(taskId);
-      updateTask(taskId, {
-        progress: 100,
-        status: "success",
-        pageId: created.id,
-      });
+      const serverTaskId = res.taskId;
+      replaceTaskId(localId, serverTaskId);
 
-      await refreshPages();
+      // 上传结束后，进入后端任务阶段。
+      updateTask(serverTaskId, { progress: 20 });
+      subscribeTaskEvents(serverTaskId);
     } catch (e: unknown) {
-      clearTaskTimer(taskId);
       const isAbort =
         typeof e === "object" &&
         e !== null &&
         "name" in e &&
         (e as { name?: unknown }).name === "AbortError";
 
-      updateTask(taskId, {
-        status: isAbort ? "cancelled" : "error",
-      });
-    } finally {
-      taskControllersRef.current.delete(taskId);
+      updateTask(localId, { status: isAbort ? "cancelled" : "error" });
+      cleanupTaskRuntime(localId);
     }
   }
 
   function handleCancelTask(taskId: string) {
-    const controller = taskControllersRef.current.get(taskId);
-    controller?.abort();
-    clearTaskTimer(taskId);
+    const runtime = taskRuntimeRef.current.get(taskId);
+    runtime?.upload?.abort();
+    runtime?.sse?.close();
+
     updateTask(taskId, { status: "cancelled" });
+
+    // 如果已经拿到后端 taskId，则通知后端取消。
+    void (async () => {
+      try {
+        await tasksApi.cancel(taskId);
+      } catch {
+        // ignore
+      }
+    })();
   }
 
   async function handlePreviewTask(taskId: string) {
@@ -242,6 +320,17 @@ export function HomeScreen(props: {
     await refreshPages();
     setSelected({ kind: "page", id: pageId, title: "" });
   }
+
+  useEffect(() => {
+    const runtimeMap = taskRuntimeRef.current;
+    return () => {
+      for (const [, runtime] of runtimeMap) {
+        runtime.upload?.abort();
+        runtime.sse?.close();
+      }
+      runtimeMap.clear();
+    };
+  }, []);
 
   useEffect(() => {
     setOpenPageMore(false);

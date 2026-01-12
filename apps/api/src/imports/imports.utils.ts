@@ -40,11 +40,3 @@ export function parseParentIds(input: unknown): string[] {
 
   throw new BadRequestException('invalid parentIds');
 }
-
-export function markdownToSlateValue(markdown: string) {
-  const lines = markdown.replace(/\r\n/g, '\n').split('\n');
-  return lines.map((line) => ({
-    type: 'paragraph',
-    children: [{ text: line }],
-  }));
-}

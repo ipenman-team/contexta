@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { TaskStatus, TaskType, type Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { TaskRuntimeService } from './task.runtime.service';
 import type { CreateTaskInput, TaskDto } from './task.dto';
 
 const TERMINAL_STATUSES: TaskStatus[] = [
@@ -11,13 +12,16 @@ const TERMINAL_STATUSES: TaskStatus[] = [
 
 @Injectable()
 export class TaskService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly taskRuntime: TaskRuntimeService,
+  ) {}
 
   async create(tenantId: string, userId: string, input: CreateTaskInput): Promise<TaskDto> {
     if (!tenantId) throw new BadRequestException('tenantId is required');
     if (!userId) throw new BadRequestException('userId is required');
 
-    return this.prisma.task.create({
+    const task = await this.prisma.task.create({
       data: {
         tenantId,
         type: input.type,
@@ -28,6 +32,9 @@ export class TaskService {
         updatedBy: userId,
       },
     });
+
+    this.taskRuntime.publish(task);
+    return task;
   }
 
   async get(tenantId: string, id: string): Promise<TaskDto> {
@@ -57,7 +64,9 @@ export class TaskService {
       },
     });
 
-    return this.get(tenantId, id);
+    const task = await this.get(tenantId, id);
+    this.taskRuntime.publish(task);
+    return task;
   }
 
   async updateProgress(tenantId: string, id: string, progress: number, message?: string) {
@@ -76,7 +85,9 @@ export class TaskService {
       },
     });
 
-    return this.get(tenantId, id);
+    const task = await this.get(tenantId, id);
+    this.taskRuntime.publish(task);
+    return task;
   }
 
   async succeed(tenantId: string, id: string, result?: unknown, message?: string) {
@@ -96,7 +107,9 @@ export class TaskService {
       },
     });
 
-    return this.get(tenantId, id);
+    const task = await this.get(tenantId, id);
+    this.taskRuntime.publish(task);
+    return task;
   }
 
   async fail(tenantId: string, id: string, error: unknown, message?: string) {
@@ -122,7 +135,9 @@ export class TaskService {
       },
     });
 
-    return this.get(tenantId, id);
+    const task = await this.get(tenantId, id);
+    this.taskRuntime.publish(task);
+    return task;
   }
 
   async cancel(tenantId: string, id: string, userId: string, message?: string) {
@@ -142,7 +157,9 @@ export class TaskService {
       },
     });
 
-    return this.get(tenantId, id);
+    const task = await this.get(tenantId, id);
+    this.taskRuntime.publish(task);
+    return task;
   }
 
   isTerminal(status: TaskStatus) {
