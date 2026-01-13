@@ -24,6 +24,32 @@ enum TaskStatus {
 enum TaskType {
   IMPORT
   EXPORT
+  RAG_INDEX
+}
+
+model RagChunk {
+  id       String @id
+  tenantId String @map("tenant_id")
+
+  pageId        String @map("page_id")
+  pageVersionId String @map("page_version_id")
+
+  chunkIndex Int    @map("chunk_index")
+  content    String
+  embedding  Unsupported("vector(1536)")
+  metadata   Json?  @db.JsonB
+
+  createdBy String @map("created_by")
+  updatedBy String @map("updated_by")
+
+  isDeleted Boolean @default(false) @map("is_deleted")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, pageId])
+  @@index([tenantId, pageVersionId])
+  @@map("rag_chunks")
 }
 
 model Page {

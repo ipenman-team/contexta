@@ -6,11 +6,7 @@
     "rootDir": "./src",
     "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo"
   },
-  "references": [
-    { "path": "../application" },
-    { "path": "../domain" },
-    { "path": "../rag" },
-    { "path": "../shared" }
-  ],
-  "include": ["src/**/*.ts"]
+  "references": [{ "path": "../shared" }],
+  "include": ["src/**/*.ts"],
+  "exclude": []
 }

@@ -18,6 +18,7 @@
   "dependencies": {
     "@contexta/application": "workspace:*",
     "@contexta/domain": "workspace:*",
+    "@contexta/rag": "workspace:*",
     "@contexta/shared": "workspace:*",
     "@prisma/client": "^6.2.1"
   },
