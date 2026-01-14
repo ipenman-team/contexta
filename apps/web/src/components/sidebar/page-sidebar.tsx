@@ -28,9 +28,9 @@ export const PageSidebar = memo(function PageSidebar({
         />
 
         <SidebarItem
-          label="Notion AI"
-          active={selected.kind === 'view' && selected.id === 'notion-ai'}
-          onClick={() => handleSelectView('notion-ai')}
+          label="ContextA AI"
+          active={selected.kind === 'view' && selected.id === 'contexta-ai'}
+          onClick={() => handleSelectView('contexta-ai')}
         />
 
         <Separator />

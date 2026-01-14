@@ -23,7 +23,7 @@ export function useUrlSync() {
         ? '/'
         : selected.id === 'settings'
           ? '/settings'
-          : '/notion-ai';
+          : '/contexta-ai';
     if (pathname !== target) router.replace(target);
   }, [pathname, router, selected]);
 }

@@ -13,6 +13,11 @@ function toVectorLiteral(vector: number[]): string {
   return `[${vector.map((n) => (Number.isFinite(n) ? n : 0)).join(',')}]`;
 }
 
+function pickPageVersionId(metadata: Record<string, unknown> | undefined): string | null {
+  const v = metadata?.pageVersionId;
+  return typeof v === 'string' && v.trim() ? v : null;
+}
+
 export class PrismaPgVectorVectorStore implements VectorStore {
   public readonly vectorDim: number;
 
@@ -28,12 +33,14 @@ export class PrismaPgVectorVectorStore implements VectorStore {
 
     for (const c of chunks) {
       const embedding = toVectorLiteral(c.embedding);
+      const pageVersionId = pickPageVersionId(c.metadata);
+      const metadata = c.metadata ? (c.metadata as any) : null;
 
       await this.prisma.$executeRaw`
         INSERT INTO "rag_chunks" (
-          "id", "tenant_id", "page_id", "page_version_id", "chunk_index", "content", "embedding", "is_deleted", "created_by", "updated_by", "created_at", "updated_at"
+          "id", "tenant_id", "page_id", "page_version_id", "chunk_index", "content", "embedding", "metadata", "is_deleted", "created_by", "updated_by", "created_at", "updated_at"
         ) VALUES (
-          ${c.id}, ${c.tenantId}, ${c.sourceId}, NULL, ${c.chunkIndex}, ${c.content}, ${embedding}::vector, false, 'system', 'system', NOW(), NOW()
+          ${c.id}, ${c.tenantId}, ${c.sourceId}, ${pageVersionId}, ${c.chunkIndex}, ${c.content}, ${embedding}::vector, ${metadata}::jsonb, false, 'system', 'system', NOW(), NOW()
         )
         ON CONFLICT ("id") DO UPDATE SET
           "tenant_id" = EXCLUDED."tenant_id",
@@ -42,6 +49,7 @@ export class PrismaPgVectorVectorStore implements VectorStore {
           "chunk_index" = EXCLUDED."chunk_index",
           "content" = EXCLUDED."content",
           "embedding" = EXCLUDED."embedding",
+          "metadata" = EXCLUDED."metadata",
           "is_deleted" = false,
           "updated_at" = NOW();
       `;

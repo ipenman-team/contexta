@@ -3,10 +3,14 @@ import { TenantId } from '../common/tenant/tenant-id.decorator';
 import { CreatePageDto } from './dto/create-page.dto';
 import { SavePageDto } from './dto/save-page.dto';
 import { PageService } from './page.service';
+import { RagIndexService } from '../rag/rag.index.service';
 
 @Controller('pages')
 export class PageController {
-  constructor(private readonly pageService: PageService) {}
+  constructor(
+    private readonly pageService: PageService,
+    private readonly ragIndexService: RagIndexService,
+  ) {}
 
   @Post()
   create(
@@ -33,7 +37,21 @@ export class PageController {
     @Headers('x-user-id') userId: string | undefined,
     @Param('id') id: string,
   ) {
-    return this.pageService.publish(tenantId, id, userId);
+    const actor = userId?.trim() || 'system';
+
+    return (async () => {
+      const published = await this.pageService.publish(tenantId, id, actor);
+
+      // Publish 后索引：后台 fire-and-forget
+      // 其他同步时机（保留思路）：启动时全量同步、定时任务每日同步、DB hook/CDC 等。
+      this.ragIndexService.startIndexPublished({
+        tenantId,
+        pageId: id,
+        pageVersionId: published.versionId,
+      });
+
+      return published;
+    })();
   }
 
   @Get(':id/published')

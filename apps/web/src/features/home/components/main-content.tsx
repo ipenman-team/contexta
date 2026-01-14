@@ -1,14 +1,24 @@
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { SlateEditor, parseContentToSlateValue, type SlateValue } from "@/components/shared/slate-editor";
-import { cn } from "@/lib/utils";
-import type { PageVersionDto, PageVersionStatus } from "@/lib/api/pages/types";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  SlateEditor,
+  parseContentToSlateValue,
+  type SlateValue,
+} from '@/components/shared/slate-editor';
+import { cn } from '@/lib/utils';
+import type { PageVersionDto, PageVersionStatus } from '@/lib/api/pages/types';
+import { ContextaAiView } from '@/features/contexta-ai/contexta-ai';
 
-import { Section } from "./section";
-import type { Selected, ViewId } from "../types";
+import { Section } from './section';
+import type { Selected, ViewId } from '../types';
 
 export function MainContent(props: {
   selected: Selected;
-  pageMode: "edit" | "preview";
+  pageMode: 'edit' | 'preview';
   activePageId: string | null;
   publishedSnapshot: {
     title: string;
@@ -29,7 +39,7 @@ export function MainContent(props: {
   formatTime: (value: string | Date) => string;
   formatYmd: (value: string | Date) => string;
 }) {
-  if (props.selected.kind === "view" && props.selected.id === "dashboard") {
+  if (props.selected.kind === 'view' && props.selected.id === 'dashboard') {
     return (
       <div className="mx-auto w-full max-w-5xl space-y-10">
         <div className="pt-2 text-4xl font-bold tracking-tight">晚上好呀</div>
@@ -50,11 +60,18 @@ export function MainContent(props: {
             {props.dashboardCards.map((c) => (
               <Card
                 key={c.title}
-                className={cn("cursor-default select-none transition-colors", c.disabled && "opacity-60")}
+                className={cn(
+                  'cursor-default select-none transition-colors',
+                  c.disabled && 'opacity-60',
+                )}
               >
                 <CardHeader className="p-4">
                   <CardTitle className="truncate text-sm">{c.title}</CardTitle>
-                  {c.meta ? <CardDescription className="text-xs">{c.meta}</CardDescription> : null}
+                  {c.meta ? (
+                    <CardDescription className="text-xs">
+                      {c.meta}
+                    </CardDescription>
+                  ) : null}
                 </CardHeader>
               </Card>
             ))}
@@ -76,8 +93,12 @@ export function MainContent(props: {
     );
   }
 
-  if (props.selected.kind === "page") {
-    const isPreview = props.pageMode === "preview";
+  if (props.selected.kind === 'view' && props.selected.id === 'contexta-ai') {
+    return <ContextaAiView />;
+  }
+
+  if (props.selected.kind === 'page') {
+    const isPreview = props.pageMode === 'preview';
     const previewTitle = props.publishedSnapshot?.title ?? props.pageTitle;
     const previewValue = isPreview
       ? props.publishedSnapshot
@@ -85,20 +106,22 @@ export function MainContent(props: {
         : props.editorValue
       : props.editorValue;
 
-    const previewEditorKey = `${props.activePageId ?? props.selected.id}-preview-${props.activePageId ? "loaded" : "loading"}-${props.publishedSnapshot?.updatedAt ?? "none"}`;
+    const previewEditorKey = `${props.activePageId ?? props.selected.id}-preview-${props.activePageId ? 'loaded' : 'loading'}-${props.publishedSnapshot?.updatedAt ?? 'none'}`;
     const editEditorKey = `${props.activePageId ?? props.selected.id}-edit`;
 
     return (
       <div className="mx-auto w-full max-w-5xl space-y-4 pt-6">
         <div className="space-y-2">
           {isPreview ? (
-            <div className="text-5xl font-bold tracking-tight">{previewTitle.trim() || "无标题文档"}</div>
+            <div className="text-5xl font-bold tracking-tight">
+              {previewTitle.trim() || '无标题文档'}
+            </div>
           ) : (
             <input
               className={cn(
-                "w-full bg-transparent text-5xl font-bold tracking-tight",
-                "placeholder:text-muted-foreground/40",
-                "focus-visible:outline-none",
+                'w-full bg-transparent text-5xl font-bold tracking-tight',
+                'placeholder:text-muted-foreground/40',
+                'focus-visible:outline-none',
               )}
               placeholder="请输入标题"
               value={props.pageTitle}
@@ -116,7 +139,7 @@ export function MainContent(props: {
             disabled={props.pageLoading}
             readOnly={isPreview}
             showToolbar={!isPreview}
-            placeholder={isPreview ? undefined : "直接输入正文…"}
+            placeholder={isPreview ? undefined : '直接输入正文…'}
           />
         </div>
 
@@ -126,10 +149,10 @@ export function MainContent(props: {
               <CardTitle className="text-sm">版本历史</CardTitle>
               <CardDescription className="text-xs">
                 {props.versionsLoading
-                  ? "加载中…"
+                  ? '加载中…'
                   : props.pageVersions.length
                     ? `共 ${props.pageVersions.length} 条`
-                    : "暂无版本"}
+                    : '暂无版本'}
               </CardDescription>
             </CardHeader>
 
@@ -142,9 +165,12 @@ export function MainContent(props: {
                   >
                     <div className="min-w-0">
                       <div className="truncate font-medium">
-                        {props.statusLabel(v.status)} · {v.title || "无标题文档"}
+                        {props.statusLabel(v.status)} ·{' '}
+                        {v.title || '无标题文档'}
                       </div>
-                      <div className="text-xs text-muted-foreground">{props.formatTime(v.createdAt)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {props.formatTime(v.createdAt)}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -155,7 +181,7 @@ export function MainContent(props: {
 
         {isPreview && props.publishedSnapshot ? (
           <div className="pt-2 text-sm text-muted-foreground">
-            最后更新人：{props.publishedSnapshot.updatedBy || "-"} · 更新时间：
+            最后更新人：{props.publishedSnapshot.updatedBy || '-'} · 更新时间：
             {props.formatYmd(props.publishedSnapshot.updatedAt)}
           </div>
         ) : null}
@@ -164,15 +190,19 @@ export function MainContent(props: {
   }
 
   const titleById: Record<ViewId, string> = {
-    dashboard: "仪表盘",
-    "notion-ai": "Notion AI",
-    settings: "设置",
+    dashboard: '仪表盘',
+    'contexta-ai': 'ContextAI',
+    settings: '设置',
   };
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-2 pt-6">
-      <div className="text-2xl font-bold tracking-tight">{titleById[props.selected.id]}</div>
-      <div className="text-sm text-muted-foreground">该区域会随左侧选中项变化。</div>
+      <div className="text-2xl font-bold tracking-tight">
+        {titleById[props.selected.id]}
+      </div>
+      <div className="text-sm text-muted-foreground">
+        该区域会随左侧选中项变化。
+      </div>
     </div>
   );
 }

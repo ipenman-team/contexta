@@ -149,11 +149,11 @@ export class RAG {
       const queryEmbedding = await this.config.embeddings.embedQuery(question);
       const embeddingMs = Date.now() - embeddingStart;
 
-    if (queryEmbedding.length !== this.config.vectorStore.vectorDim) {
-      throw new Error(
-        `vectorDim mismatch: expected ${this.config.vectorStore.vectorDim}, got ${queryEmbedding.length}`,
-      );
-    }
+      if (queryEmbedding.length !== this.config.vectorStore.vectorDim) {
+        throw new Error(
+          `vectorDim mismatch: expected ${this.config.vectorStore.vectorDim}, got ${queryEmbedding.length}`,
+        );
+      }
 
       const retrieveStart = Date.now();
       const candidates = await this.config.vectorStore.similaritySearch(queryEmbedding, {
@@ -162,38 +162,39 @@ export class RAG {
       });
       const retrieveMs = Date.now() - retrieveStart;
 
-    const passed = candidates.filter(
-      (c) => c.score >= this.config.retrieval.similarityThreshold,
-    );
+      const passed = candidates.filter(
+        (c) => c.score <= this.config.retrieval.similarityThreshold,
+      );
 
-    const context = passed
-      .map((c, i) => `【${i + 1} ${c.sourceId}#${c.chunkIndex}】\n${c.content}`)
-      .join('\n\n');
+      const context = passed
+        .map((c, i) => `【${i + 1} ${c.sourceId}#${c.chunkIndex}】\n${c.content}`)
+        .join('\n\n');
 
-    const terms = extractKeywords(question).slice(0, 8);
-    const lowerContext = context.toLowerCase();
-    const covered = terms.filter((t) => lowerContext.includes(t.toLowerCase()));
-    const hasCriticalTerms = covered.length > 0;
+      const terms = extractKeywords(question).slice(0, 8);
+      const lowerContext = context.toLowerCase();
+      const covered = terms.filter((t) => lowerContext.includes(t.toLowerCase()));
+      const hasCriticalTerms = covered.length > 0;
 
-    const fallback = passed.length === 0 || !hasCriticalTerms;
+      const fallback = passed.length === 0 || !hasCriticalTerms;
 
       const llmStart = Date.now();
       const res = fallback
-      ? {
-          content: hasCriticalTerms
-            ? '我不知道（未检索到足够相关的上下文）'
-            : '我不知道（上下文不包含关键术语，可能未命中问题要点）',
-        }
-      : await this.config.chat.generate([
-          {
-            role: 'system',
-            content: '你是一个 RAG 助手。只能根据上下文回答问题。如果上下文不足以回答，请直接说“我不知道”。',
-          },
-          {
-            role: 'user',
-            content: `上下文：\n${context}\n\n问题：\n${question}`,
-          },
-        ]);
+        ? {
+            content: hasCriticalTerms
+              ? '我暂时没在知识库里找到足够相关的内容来回答这个问题。'
+              : '我不知道（目前检索到的资料没有覆盖你问题里的关键信息）。',
+          }
+        : await this.config.chat.generate([
+            {
+              role: 'system',
+              content:
+                '你是一个面向用户的知识库问答助手。请只依据给定的资料片段回答，不要编造或脑补。回答要自然口语化、直接给结论，必要时再补充一两句解释。不要写“根据上下文/资料”等措辞，也不要输出小标题、编号或列表（除非用户明确要求）。如果资料不足以支撑答案，请直接说“我不知道”，并用一句话说明缺少哪类信息；最多提出 1 个澄清问题。',
+            },
+            {
+              role: 'user',
+              content: `资料片段：\n${context}\n\n用户问题：\n${question}`,
+            },
+          ]);
       const llmMs = Date.now() - llmStart;
 
       const totalMs = Date.now() - started;
@@ -208,28 +209,30 @@ export class RAG {
       );
 
       return {
-      answer: res.content,
-      hit: !fallback,
-      meta: {
-        timing: { embeddingMs, retrieveMs, llmMs, totalMs },
-        termCoverage: {
-          terms,
-          covered,
-          ratio: terms.length ? covered.length / terms.length : 0,
+        answer: res.content,
+        hit: !fallback,
+        meta: {
+          timing: { embeddingMs, retrieveMs, llmMs, totalMs },
+          termCoverage: {
+            terms,
+            covered,
+            ratio: terms.length ? covered.length / terms.length : 0,
+          },
+          retrieval: {
+            topK: this.config.retrieval.topK,
+            threshold: this.config.retrieval.similarityThreshold,
+            candidates: candidates.map((c) => ({ id: c.id, score: c.score, source: 'semantic' })),
+            selected: passed.map((c) => ({ id: c.id, score: c.score })),
+          },
+          fallback: fallback
+            ? { reason: passed.length === 0 ? 'no_hit' : 'term_not_covered' }
+            : undefined,
+          model: {
+            chatModel: this.config.chat.model,
+            embedModel: this.config.embeddings.model,
+            vectorDim: this.config.vectorStore.vectorDim,
+          },
         },
-        retrieval: {
-          topK: this.config.retrieval.topK,
-          threshold: this.config.retrieval.similarityThreshold,
-          candidates: candidates.map((c) => ({ id: c.id, score: c.score, source: 'semantic' })),
-          selected: passed.map((c) => ({ id: c.id, score: c.score })),
-        },
-        fallback: fallback ? { reason: passed.length === 0 ? 'no_hit' : 'term_not_covered' } : undefined,
-        model: {
-          chatModel: this.config.chat.model,
-          embedModel: this.config.embeddings.model,
-          vectorDim: this.config.vectorStore.vectorDim,
-        },
-      },
       };
     } catch (error) {
       const ms = Date.now() - started;

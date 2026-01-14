@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PageController } from '../../page.controller';
 import { PageService } from '../../page.service';
+import { RagIndexService } from '../../../rag/rag.index.service';
 
 describe('PageController', () => {
   let controller: PageController;
@@ -13,12 +14,19 @@ describe('PageController', () => {
     list: jest.fn(),
   };
 
+  const ragIndexService = {
+    startIndexPublished: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.resetAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PageController],
-      providers: [{ provide: PageService, useValue: pageService }],
+      providers: [
+        { provide: PageService, useValue: pageService },
+        { provide: RagIndexService, useValue: ragIndexService },
+      ],
     }).compile();
 
     controller = module.get(PageController);
@@ -27,22 +35,22 @@ describe('PageController', () => {
   it('create forwards tenantId + body', async () => {
     pageService.create.mockResolvedValue({ id: 'p1' });
 
-    await expect(controller.create('t1', { title: 'Hello' })).resolves.toEqual({
+    await expect(controller.create('t1', undefined, { title: 'Hello' } as any)).resolves.toEqual({
       id: 'p1',
     });
 
-    expect(pageService.create).toHaveBeenCalledWith('t1', { title: 'Hello' });
+    expect(pageService.create).toHaveBeenCalledWith('t1', { title: 'Hello' }, undefined);
   });
 
   it('save forwards tenantId + id + body', async () => {
     pageService.save.mockResolvedValue({ id: 'p1', title: 'X' });
 
-    await expect(controller.save('t1', 'p1', { title: 'X' })).resolves.toEqual({
+    await expect(controller.save('t1', undefined, 'p1', { title: 'X' } as any)).resolves.toEqual({
       id: 'p1',
       title: 'X',
     });
 
-    expect(pageService.save).toHaveBeenCalledWith('t1', 'p1', { title: 'X' });
+    expect(pageService.save).toHaveBeenCalledWith('t1', 'p1', { title: 'X' }, undefined);
   });
 
   it('remove forwards id + tenantId', async () => {

@@ -32,11 +32,11 @@ model RagChunk {
   tenantId String @map("tenant_id")
 
   pageId        String @map("page_id")
-  pageVersionId String @map("page_version_id")
+  pageVersionId String? @map("page_version_id")
 
   chunkIndex Int    @map("chunk_index")
   content    String
-  embedding  Unsupported("vector(1536)")
+  embedding  Unsupported("vector(2560)")
   metadata   Json?  @db.JsonB
 
   createdBy String @map("created_by")

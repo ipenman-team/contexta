@@ -14,6 +14,7 @@
     { "path": "../../packages/domain" },
     { "path": "../../packages/application" },
     { "path": "../../packages/infrastructure" },
+    { "path": "../../packages/rag" },
     { "path": "../../packages/slate-converters" }
   ],
   "include": ["src/**/*.ts"],

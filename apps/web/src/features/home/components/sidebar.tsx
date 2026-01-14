@@ -36,9 +36,9 @@ export function Sidebar<T>(props: {
         />
 
         <SidebarItem
-          label="Notion AI"
-          active={props.selected.kind === "view" && props.selected.id === "notion-ai"}
-          onClick={() => props.onSelectView("notion-ai")}
+          label="ContextA AI"
+          active={props.selected.kind === "view" && props.selected.id === "contexta-ai"}
+          onClick={() => props.onSelectView("contexta-ai")}
         />
 
         <Separator />
