@@ -100,26 +100,30 @@ export function ContextaAiView() {
     abortRef.current = null;
   }
 
-  async function handleSend() {
-    const q = value.trim();
-    if (!q || loading) return;
+  async function sendQuestion(q: string, options?: { updateInput?: boolean }) {
+    const question = q.trim();
+    if (!question || loading) return;
 
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setSubmittedQuestion(q);
-    setValue("");
+    setSubmittedQuestion(question);
+    if (options?.updateInput !== false) setValue("");
     setAnswer("");
     setError(null);
     setLoading(true);
 
     try {
-      await answerQuestion(q, {
-        onDelta: (delta) => {
-          setAnswer((prev) => (prev ?? "") + delta);
+      await answerQuestion(
+        question,
+        {
+          onDelta: (delta) => {
+            setAnswer((prev) => (prev ?? "") + delta);
+          },
         },
-      }, { signal: controller.signal });
+        { signal: controller.signal },
+      );
     } catch (e) {
       if (
         (e instanceof DOMException && e.name === "AbortError") ||
@@ -133,6 +137,23 @@ export function ContextaAiView() {
       setLoading(false);
       abortRef.current = null;
     }
+  }
+
+  async function handleSend() {
+    const q = value.trim();
+    if (!q || loading) return;
+
+    await sendQuestion(q, { updateInput: true });
+  }
+
+  async function handleRetry() {
+    if (!submittedQuestion || loading) return;
+    await sendQuestion(submittedQuestion, { updateInput: false });
+  }
+
+  async function handleRegenerate() {
+    if (!submittedQuestion || loading) return;
+    await sendQuestion(submittedQuestion, { updateInput: false });
   }
 
   const inAnswerMode = submittedQuestion !== null;
@@ -216,9 +237,35 @@ export function ContextaAiView() {
                 ) : null}
 
                 {error ? (
-                  <div className="mt-3 text-sm text-destructive">{error}</div>
+                  <div className="mt-3 flex items-center gap-3">
+                    <div className="text-sm text-destructive">{error}</div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleRetry}
+                      disabled={loading}
+                    >
+                      重试
+                    </Button>
+                  </div>
                 ) : answer !== null ? (
-                  <Markdown className="mt-3" content={answer} />
+                  <div className="mt-3">
+                    <Markdown content={answer} />
+
+                    {submittedQuestion && !loading && answer.trim().length > 0 ? (
+                      <div className="mt-3 flex justify-end">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={handleRegenerate}
+                        >
+                          重新生成
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             </div>
