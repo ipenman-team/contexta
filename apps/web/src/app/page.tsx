@@ -216,6 +216,59 @@ export function HomeScreen(props: {
     ]
   );
 
+  const startImportPdf = useCallback(
+    async (file: File) => {
+      const localId = createTaskId();
+      const upload = new AbortController();
+      useTaskStore.getState().setTaskRuntime(localId, { upload });
+
+      addTask({
+        id: localId,
+        label: file.name,
+        progress: 0,
+        status: 'running',
+      });
+
+      try {
+        const title = stripFileExt(file.name);
+
+        const res = await importsApi.createPdf(
+          { file, title },
+          {
+            signal: upload.signal,
+            onUploadProgress: (pct) => {
+              updateTask(localId, {
+                progress: Math.round((pct / 100) * 20),
+              });
+            },
+          },
+        );
+
+        const serverTaskId = res.taskId;
+        replaceTaskId(localId, serverTaskId);
+        updateTask(serverTaskId, { progress: 20 });
+        subscribeTaskEvents(serverTaskId);
+      } catch (e: unknown) {
+        const isAbort =
+          typeof e === 'object' &&
+          e !== null &&
+          'name' in e &&
+          (e as { name?: unknown }).name === 'AbortError';
+
+        updateTask(localId, { status: isAbort ? 'cancelled' : 'error' });
+        useTaskStore.getState().cleanupTaskRuntime(localId);
+      }
+    },
+    [
+      createTaskId,
+      stripFileExt,
+      addTask,
+      updateTask,
+      replaceTaskId,
+      subscribeTaskEvents,
+    ]
+  );
+
   const handleCancelTask = useCallback(
     (taskId: string) => {
       const runtime = useTaskStore.getState().getTaskRuntime(taskId);
@@ -368,6 +421,9 @@ export function HomeScreen(props: {
         onOpenChange={(open) => setOpenImportModal(open)}
         onPickMarkdownFile={(file) => {
           void startImportMarkdown(file);
+        }}
+        onPickPdfFile={(file) => {
+          void startImportPdf(file);
         }}
       />
 

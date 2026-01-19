@@ -32,21 +32,35 @@ function convertInlineText(input: string, marks: Marks = {}): SlateText[] {
     if (chunk) out.push(...applyMark(chunk, nextMarks));
   };
 
+  const findNextToken = (from: number): number => {
+    let next = -1;
+    const candidates = ['<u>', '<ins>', '**', '__', '*', '_', '`'] as const;
+    for (const token of candidates) {
+      const idx = text.indexOf(token, from);
+      if (idx === -1) continue;
+      if (next === -1 || idx < next) next = idx;
+    }
+    return next;
+  };
+
   let i = 0;
   while (i < text.length) {
     const uOpen = text.slice(i).match(/^<(u|ins)>/i);
     if (uOpen) {
       const tag = uOpen[1];
-      const close = new RegExp(`^</${tag}>`, 'i');
       const start = i + uOpen[0].length;
+      const closeTag = `</${tag}>`;
       const rest = text.slice(start);
-      const closeIndex = rest.search(close);
+      const closeIndex = rest.toLowerCase().indexOf(closeTag.toLowerCase());
       if (closeIndex >= 0) {
         const inner = rest.slice(0, closeIndex);
         out.push(...convertInlineText(inner, { ...marks, underline: true }));
-        i = start + closeIndex + `</${tag}>`.length;
+        i = start + closeIndex + closeTag.length;
         continue;
       }
+      pushText(text[i] ?? '', marks);
+      i += 1;
+      continue;
     }
 
     const tokenSpecs: Array<{ open: string; close: string; next: Marks }> = [
@@ -62,10 +76,12 @@ function convertInlineText(input: string, marks: Marks = {}): SlateText[] {
       if (!text.startsWith(spec.open, i)) continue;
       const start = i + spec.open.length;
       const end = text.indexOf(spec.close, start);
-      if (end === -1) continue;
-
-      const before = text.slice(i, i);
-      if (before) pushText(before, marks);
+      if (end === -1) {
+        pushText(spec.open, marks);
+        i = start;
+        matched = true;
+        break;
+      }
 
       const inner = text.slice(start, end);
       if (spec.open === '`') {
@@ -80,25 +96,17 @@ function convertInlineText(input: string, marks: Marks = {}): SlateText[] {
     }
     if (matched) continue;
 
-    const nextToken = (() => {
-      const candidates: number[] = [];
-      const pushCandidate = (idx: number) => {
-        if (idx >= 0) candidates.push(idx);
-      };
-      pushCandidate(text.indexOf('<u>', i));
-      pushCandidate(text.indexOf('<ins>', i));
-      pushCandidate(text.indexOf('**', i));
-      pushCandidate(text.indexOf('__', i));
-      pushCandidate(text.indexOf('*', i));
-      pushCandidate(text.indexOf('_', i));
-      pushCandidate(text.indexOf('`', i));
-      if (candidates.length === 0) return -1;
-      return Math.min(...candidates.filter((n) => n >= 0));
-    })();
+    const nextToken = findNextToken(i);
 
     if (nextToken === -1) {
       pushText(text.slice(i), marks);
       break;
+    }
+
+    if (nextToken <= i) {
+      pushText(text[i] ?? '', marks);
+      i += 1;
+      continue;
     }
 
     pushText(text.slice(i, nextToken), marks);

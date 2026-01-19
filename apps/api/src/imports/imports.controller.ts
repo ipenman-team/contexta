@@ -42,13 +42,26 @@ export class ImportsController {
 
     const task = await this.importsService.createImportTask(tenantId, actor, body, file.originalname);
 
-    this.importsService.startMarkdownImport({
-      tenantId,
-      userId: actor,
-      taskId: task.id,
-      req: body,
-      file,
-    });
+    const format = String(body?.format ?? 'markdown').toLowerCase();
+    if (format === 'markdown') {
+      this.importsService.startMarkdownImport({
+        tenantId,
+        userId: actor,
+        taskId: task.id,
+        req: body,
+        file,
+      });
+    } else if (format === 'pdf') {
+      this.importsService.startPdfImport({
+        tenantId,
+        userId: actor,
+        taskId: task.id,
+        req: body,
+        file,
+      });
+    } else {
+      throw new BadRequestException('format not supported');
+    }
 
     return { ok: true, taskId: task.id };
   }

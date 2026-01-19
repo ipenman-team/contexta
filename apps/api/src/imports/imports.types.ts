@@ -1,4 +1,4 @@
-export type ImportFormat = 'markdown';
+export type ImportFormat = 'markdown' | 'pdf';
 
 export type ImportRequest = {
   format?: ImportFormat;

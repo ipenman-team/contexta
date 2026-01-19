@@ -24,16 +24,17 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --selectProjects unit --runInBand"
   },
   "dependencies": {
+    "@contexta/infrastructure": "workspace:*",
+    "@contexta/rag": "workspace:*",
+    "@contexta/slate-converters": "workspace:*",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
     "@prisma/client": "^6.2.1",
-    "@contexta/rag": "workspace:*",
-    "@contexta/infrastructure": "workspace:*",
     "dotenv": "^17.2.3",
-      "@contexta/slate-converters": "workspace:*",
     "multer": "^2.0.2",
+    "pdf-parse": "^2.4.5",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },

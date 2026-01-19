@@ -5,7 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 
-type ImportType = "markdown";
+type ImportType = "markdown" | "pdf";
 
 type ImportOption = {
   id: string;
@@ -52,9 +52,11 @@ export function ImportPageModal(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPickMarkdownFile: (file: File) => void;
+  onPickPdfFile: (file: File) => void;
 }) {
   const [selected, setSelected] = useState<ImportType | null>("markdown");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const pdfInputRef = useRef<HTMLInputElement | null>(null);
 
   const options: ImportOption[] = useMemo(
     () =>
@@ -66,6 +68,13 @@ export function ImportPageModal(props: {
           extensions: ".markdown .md .mark .txt",
           enabled: true,
           type: "markdown",
+        },
+        {
+          id: "pdf",
+          label: "PDF",
+          extensions: ".pdf",
+          enabled: true,
+          type: "pdf",
         },
         { id: "markdown-zip", label: "Markdown Zip", extensions: ".zip", enabled: false, type: null },
         { id: "html-zip", label: "HTML Zip", extensions: ".zip", enabled: false, type: null },
@@ -98,6 +107,8 @@ export function ImportPageModal(props: {
                     setSelected(opt.type);
                     if (opt.type === "markdown") {
                       fileInputRef.current?.click();
+                    } else if (opt.type === "pdf") {
+                      pdfInputRef.current?.click();
                     }
                   }
                 : undefined
@@ -117,6 +128,21 @@ export function ImportPageModal(props: {
           if (!file) return;
 
           props.onPickMarkdownFile(file);
+          props.onOpenChange(false);
+        }}
+      />
+
+      <input
+        ref={pdfInputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+
+          props.onPickPdfFile(file);
           props.onOpenChange(false);
         }}
       />
