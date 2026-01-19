@@ -1,5 +1,6 @@
-import { pdfPagesToMarkdown } from '../../imports.utils';
-import { markdownToSlateValue, slateToPlainText } from '@contexta/slate-converters';
+import { markdownToSlateValue } from '../../markdown';
+import { pdfPagesToMarkdown } from '../../pdf';
+import { slateToPlainText } from '../../plain-text';
 
 describe('pdfPagesToMarkdown', () => {
   it('removes pagination lines', () => {
@@ -56,3 +57,4 @@ describe('pdfPagesToMarkdown', () => {
     expect(md).toContain('> Indented line');
   });
 });
+
