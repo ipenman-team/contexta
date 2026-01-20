@@ -13,7 +13,10 @@ export function useUrlSync() {
 
   useEffect(() => {
     if (selected.kind === 'page') {
-      const target = `/pages/${encodeURIComponent(selected.id)}`;
+      const editing = pathname.startsWith('/pages/') && pathname.endsWith('/edit');
+      const target = editing
+        ? `/pages/${encodeURIComponent(selected.id)}/edit`
+        : `/pages/${encodeURIComponent(selected.id)}`;
       if (pathname !== target) router.replace(target);
       return;
     }

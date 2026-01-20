@@ -39,7 +39,8 @@ export class RagController {
         signal: controller.signal,
       })) {
         if (evt.type === 'delta') writeEvent('delta', { delta: evt.delta });
-        if (evt.type === 'meta') writeEvent('meta', { hit: evt.hit, meta: evt.meta });
+        if (evt.type === 'meta')
+          writeEvent('meta', { hit: evt.hit, meta: evt.meta });
         if (evt.type === 'done') writeEvent('done', { done: true });
       }
     } catch (error) {

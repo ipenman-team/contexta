@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Headers, Param, Post, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  Param,
+  Post,
+  Put,
+} from '@nestjs/common';
 import { TenantId } from '../common/tenant/tenant-id.decorator';
 import { CreatePageDto } from './dto/create-page.dto';
 import { SavePageDto } from './dto/save-page.dto';
@@ -29,6 +38,16 @@ export class PageController {
     @Body() body: SavePageDto,
   ) {
     return this.pageService.save(tenantId, id, body, userId);
+  }
+
+  @Post(':id/rename')
+  rename(
+    @TenantId() tenantId: string,
+    @Headers('x-user-id') userId: string | undefined,
+    @Param('id') id: string,
+    @Body() body: { title: string },
+  ) {
+    return this.pageService.rename(tenantId, id, body, userId);
   }
 
   @Post(':id/publish')

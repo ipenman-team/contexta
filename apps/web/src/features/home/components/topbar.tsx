@@ -20,7 +20,7 @@ export function PageTopbar(props: {
 }) {
   if (!props.visible) return null;
 
-  const title = (props.pageMode === "preview" ? props.publishedTitle : props.pageTitle)?.trim() || "无标题文档";
+  const title = props.pageTitle?.trim() || "无标题文档";
 
   return (
     <div className="sticky top-0 z-20 border-b bg-background">

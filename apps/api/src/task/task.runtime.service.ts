@@ -47,13 +47,20 @@ export class TaskRuntimeService {
     subject.next(task);
 
     // terminal task: allow clients to receive final state then cleanup
-    if (task.status === 'SUCCEEDED' || task.status === 'FAILED' || task.status === 'CANCELLED') {
+    if (
+      task.status === 'SUCCEEDED' ||
+      task.status === 'FAILED' ||
+      task.status === 'CANCELLED'
+    ) {
       subject.complete();
       const entry = this.taskStreams.get(task.id);
       if (entry) {
-        entry.cleanupTimer = setTimeout(() => {
-          this.taskStreams.delete(task.id);
-        }, 5 * 60 * 1000);
+        entry.cleanupTimer = setTimeout(
+          () => {
+            this.taskStreams.delete(task.id);
+          },
+          5 * 60 * 1000,
+        );
       }
     }
   }

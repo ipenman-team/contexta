@@ -8,6 +8,7 @@ describe('PageController', () => {
 
   const pageService = {
     create: jest.fn(),
+    rename: jest.fn(),
     save: jest.fn(),
     remove: jest.fn(),
     get: jest.fn(),
@@ -35,22 +36,53 @@ describe('PageController', () => {
   it('create forwards tenantId + body', async () => {
     pageService.create.mockResolvedValue({ id: 'p1' });
 
-    await expect(controller.create('t1', undefined, { title: 'Hello' })).resolves.toEqual({
+    await expect(
+      controller.create('t1', undefined, { title: 'Hello' }),
+    ).resolves.toEqual({
       id: 'p1',
     });
 
-    expect(pageService.create).toHaveBeenCalledWith('t1', { title: 'Hello' }, undefined);
+    expect(pageService.create).toHaveBeenCalledWith(
+      't1',
+      { title: 'Hello' },
+      undefined,
+    );
   });
 
   it('save forwards tenantId + id + body', async () => {
     pageService.save.mockResolvedValue({ id: 'p1', title: 'X' });
 
-    await expect(controller.save('t1', undefined, 'p1', { title: 'X' })).resolves.toEqual({
+    await expect(
+      controller.save('t1', undefined, 'p1', { title: 'X' }),
+    ).resolves.toEqual({
       id: 'p1',
       title: 'X',
     });
 
-    expect(pageService.save).toHaveBeenCalledWith('t1', 'p1', { title: 'X' }, undefined);
+    expect(pageService.save).toHaveBeenCalledWith(
+      't1',
+      'p1',
+      { title: 'X' },
+      undefined,
+    );
+  });
+
+  it('rename forwards tenantId + id + body', async () => {
+    pageService.rename.mockResolvedValue({ id: 'p1', title: 'Y' });
+
+    await expect(
+      controller.rename('t1', undefined, 'p1', { title: 'Y' }),
+    ).resolves.toEqual({
+      id: 'p1',
+      title: 'Y',
+    });
+
+    expect(pageService.rename).toHaveBeenCalledWith(
+      't1',
+      'p1',
+      { title: 'Y' },
+      undefined,
+    );
   });
 
   it('remove forwards id + tenantId', async () => {

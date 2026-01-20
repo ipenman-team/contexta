@@ -26,6 +26,8 @@ describe('PageService', () => {
     },
     pageVersion: {
       create: jest.fn(),
+      findFirst: jest.fn(),
+      update: jest.fn(),
     },
   };
 
@@ -58,7 +60,9 @@ describe('PageService', () => {
       prisma.page.create.mockResolvedValue(samplePage());
       prisma.pageVersion.create.mockResolvedValue({ id: 'v1' });
 
-      await expect(service.create('t1', { title: 'Hello' })).resolves.toMatchObject({
+      await expect(
+        service.create('t1', { title: 'Hello' }),
+      ).resolves.toMatchObject({
         id: 'p1',
         tenantId: 't1',
         title: 'Hello',
@@ -78,11 +82,15 @@ describe('PageService', () => {
     });
 
     it('rejects missing tenantId', async () => {
-      await expect(service.create('', { title: 'Hello' })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(
+        service.create('', { title: 'Hello' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('rejects missing title', async () => {
-      await expect(service.create('t1', { title: '' })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.create('t1', { title: '' })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
   });
 
@@ -91,17 +99,23 @@ describe('PageService', () => {
       prisma.page.findFirst.mockResolvedValue(
         samplePage({ title: 'Old', content: 'A', parentIds: ['x'] }),
       );
-      prisma.page.update.mockResolvedValue(samplePage({ title: 'New', content: 'A', parentIds: ['x'] }));
+      prisma.page.update.mockResolvedValue(
+        samplePage({ title: 'New', content: 'A', parentIds: ['x'] }),
+      );
       prisma.pageVersion.create.mockResolvedValue({ id: 'v2' });
 
-      await expect(service.save('t1', 'p1', { title: 'New' })).resolves.toMatchObject({
+      await expect(
+        service.save('t1', 'p1', { title: 'New' }),
+      ).resolves.toMatchObject({
         id: 'p1',
         title: 'New',
         content: 'A',
         parentIds: ['x'],
       });
 
-      expect(prisma.page.findFirst).toHaveBeenCalledWith({ where: { id: 'p1', tenantId: 't1' } });
+      expect(prisma.page.findFirst).toHaveBeenCalledWith({
+        where: { id: 'p1', tenantId: 't1' },
+      });
       expect(prisma.page.update).toHaveBeenCalledWith({
         where: { id: 'p1' },
         data: {
@@ -114,19 +128,83 @@ describe('PageService', () => {
     });
 
     it('rejects missing id', async () => {
-      await expect(service.save('t1', '', {})).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.save('t1', '', {})).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
 
     it('rejects missing tenantId', async () => {
-      await expect(service.save('', 'p1', {})).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.save('', 'p1', {})).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
 
     it('throws when page not found', async () => {
       prisma.page.findFirst.mockResolvedValue(null);
 
-      await expect(service.save('t1', 'p1', { title: 'New' })).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.save('t1', 'p1', { title: 'New' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('rename', () => {
+    it('updates page title and syncs latest published title', async () => {
+      prisma.page.findFirst.mockResolvedValue(samplePage({ title: 'Old' }));
+      prisma.page.update.mockResolvedValue(samplePage({ title: 'New' }));
+      prisma.pageVersion.create.mockResolvedValue({ id: 'v-temp' });
+      prisma.pageVersion.findFirst.mockResolvedValue({ id: 'v-pub' });
+      prisma.pageVersion.update.mockResolvedValue({ id: 'v-pub' });
+
+      await expect(
+        service.rename('t1', 'p1', { title: 'New' }),
+      ).resolves.toMatchObject({
+        id: 'p1',
+        title: 'New',
+      });
+
+      expect(prisma.page.update).toHaveBeenCalledWith({
+        where: { id: 'p1' },
+        data: {
+          title: 'New',
+          updatedBy: 'system',
+        },
+      });
+
+      expect(prisma.pageVersion.findFirst).toHaveBeenCalledWith({
+        where: {
+          tenantId: 't1',
+          pageId: 'p1',
+          status: 'PUBLISHED',
+          isDeleted: false,
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+
+      expect(prisma.pageVersion.update).toHaveBeenCalledWith({
+        where: { id: 'v-pub' },
+        data: {
+          title: 'New',
+          updatedBy: 'system',
+        },
+      });
+    });
+
+    it('updates page title and skips published sync when none exists', async () => {
+      prisma.page.findFirst.mockResolvedValue(samplePage({ title: 'Old' }));
+      prisma.page.update.mockResolvedValue(samplePage({ title: 'New' }));
+      prisma.pageVersion.create.mockResolvedValue({ id: 'v-temp' });
+      prisma.pageVersion.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.rename('t1', 'p1', { title: 'New' }),
+      ).resolves.toMatchObject({
+        id: 'p1',
+        title: 'New',
+      });
+
+      expect(prisma.pageVersion.update).not.toHaveBeenCalled();
     });
   });
 
@@ -137,14 +215,18 @@ describe('PageService', () => {
 
       await expect(service.remove('p1', 't1')).resolves.toEqual({ ok: true });
 
-      expect(prisma.page.findFirst).toHaveBeenCalledWith({ where: { id: 'p1', tenantId: 't1' } });
+      expect(prisma.page.findFirst).toHaveBeenCalledWith({
+        where: { id: 'p1', tenantId: 't1' },
+      });
       expect(prisma.page.delete).toHaveBeenCalledWith({ where: { id: 'p1' } });
     });
 
     it('throws when not found', async () => {
       prisma.page.findFirst.mockResolvedValue(null);
 
-      await expect(service.remove('p1', 't1')).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.remove('p1', 't1')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
     });
   });
 
@@ -152,14 +234,21 @@ describe('PageService', () => {
     it('returns page', async () => {
       prisma.page.findFirst.mockResolvedValue(samplePage());
 
-      await expect(service.get('p1', 't1')).resolves.toMatchObject({ id: 'p1', tenantId: 't1' });
-      expect(prisma.page.findFirst).toHaveBeenCalledWith({ where: { id: 'p1', tenantId: 't1' } });
+      await expect(service.get('p1', 't1')).resolves.toMatchObject({
+        id: 'p1',
+        tenantId: 't1',
+      });
+      expect(prisma.page.findFirst).toHaveBeenCalledWith({
+        where: { id: 'p1', tenantId: 't1' },
+      });
     });
 
     it('throws when not found', async () => {
       prisma.page.findFirst.mockResolvedValue(null);
 
-      await expect(service.get('p1', 't1')).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.get('p1', 't1')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
     });
   });
 
@@ -175,7 +264,9 @@ describe('PageService', () => {
     });
 
     it('rejects missing tenantId', async () => {
-      await expect(service.list('')).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.list('')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
   });
 });

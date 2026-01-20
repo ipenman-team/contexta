@@ -11,23 +11,27 @@ import {
   usePageTitle,
   useEditorValue,
   usePageContentStore,
+  useSelectedPageId,
 } from '@/stores';
 
 export const PageEditor = memo(function PageEditor() {
   const pageMode = usePageMode();
   const pageTitle = usePageTitle();
   const editorValue = useEditorValue();
-  const pageLoading = usePageContentStore((s) => s.pageLoading);
+  const selectedPageId = useSelectedPageId();
   const publishedSnapshot = usePageContentStore((s) => s.publishedSnapshot);
+  const pageLoading = usePageContentStore((s) => s.pageLoading);
   const { setPageTitle, setEditorValue } = usePageContentStore();
 
   const isPreview = pageMode === 'preview';
   const previewTitle = publishedSnapshot?.title ?? pageTitle;
-  const previewValue = isPreview
-    ? publishedSnapshot
-      ? parseContentToSlateValue(publishedSnapshot.content)
-      : editorValue
+  const previewValue = publishedSnapshot
+    ? parseContentToSlateValue(publishedSnapshot.content)
     : editorValue;
+
+  const pageKeyBase = selectedPageId ?? 'none';
+  const previewEditorKey = `${pageKeyBase}-preview-${publishedSnapshot?.updatedAt ?? 'none'}`;
+  const editEditorKey = `${pageKeyBase}-edit`;
 
   const handleTitleChange = useCallback(
     (value: string) => setPageTitle(value),
@@ -55,6 +59,7 @@ export const PageEditor = memo(function PageEditor() {
 
       <div className="pt-2">
         <SlateEditor
+          key={isPreview ? previewEditorKey : editEditorKey}
           value={previewValue}
           onChange={handleEditorChange}
           disabled={pageLoading}

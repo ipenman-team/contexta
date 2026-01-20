@@ -51,14 +51,18 @@ describe('ImportsService markdown nested lists', () => {
     });
 
     expect(pageService.create).toHaveBeenCalledTimes(1);
-    const createArgs = (pageService.create as jest.Mock).mock.calls[0] ?? [];
-    const payload = createArgs[1] as { content: unknown };
+    const createMock = pageService.create as jest.Mock<
+      Promise<unknown>,
+      [string, { content?: unknown }, string?]
+    >;
+    const createArgs = createMock.mock.calls[0];
+    const payload = (createArgs?.[1] ?? {}) as { content?: unknown };
 
     expect(Array.isArray(payload.content)).toBe(true);
-    const content = payload.content as unknown as Array<Record<string, unknown>>;
+    const content = payload.content as Array<Record<string, unknown>>;
     expect(content[0]?.type).toBe('bulleted-list');
 
-    const a = content[0]?.children as unknown as Array<Record<string, unknown>>;
+    const a = content[0]?.children as Array<Record<string, unknown>>;
     const aItem = a[0] as unknown as { children: unknown[] };
     const nested = aItem.children.find((c) => {
       if (!c || typeof c !== 'object') return false;

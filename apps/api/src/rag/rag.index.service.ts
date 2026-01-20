@@ -12,7 +12,11 @@ export class RagIndexService {
   }) {
     void (async () => {
       try {
-        await this.ragService.indexPublished(args.tenantId, args.pageId, args.pageVersionId);
+        await this.ragService.indexPublished(
+          args.tenantId,
+          args.pageId,
+          args.pageVersionId,
+        );
       } catch (error) {
         // 不阻塞 publish；失败交由日志/后续可观测体系处理
         console.error('[RAG][index_failed]', {

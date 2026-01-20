@@ -3,8 +3,15 @@ import { TaskStatus, TaskType } from '@prisma/client';
 import { PageService } from '../page/page.service';
 import { TaskRuntimeService } from '../task/task.runtime.service';
 import { TaskService } from '../task/task.service';
-import { markdownToSlateValue, pdfPagesToMarkdown } from '@contexta/slate-converters';
-import { fileNameToTitle, normalizeDocxMarkdown, parseParentIds } from './imports.utils';
+import {
+  markdownToSlateValue,
+  pdfPagesToMarkdown,
+} from '@contexta/slate-converters';
+import {
+  fileNameToTitle,
+  normalizeDocxMarkdown,
+  parseParentIds,
+} from './imports.utils';
 import type { ImportRequest } from './imports.types';
 import * as fs from 'node:fs/promises';
 import { PDFParse } from 'pdf-parse';
@@ -24,7 +31,12 @@ export class ImportsService {
     private readonly pageService: PageService,
   ) {}
 
-  async createImportTask(tenantId: string, userId: string, req: ImportRequest, fileName?: string) {
+  async createImportTask(
+    tenantId: string,
+    userId: string,
+    req: ImportRequest,
+    fileName?: string,
+  ) {
     const format = (req.format ?? 'markdown').toLowerCase();
     if (format !== 'markdown' && format !== 'pdf' && format !== 'docx') {
       throw new BadRequestException('format not supported');
@@ -80,26 +92,52 @@ export class ImportsService {
     this.taskRuntime.registerAbortController(args.taskId, controller);
 
     try {
-      await this.taskService.markRunning(args.tenantId, args.taskId, 'Reading file');
+      await this.taskService.markRunning(
+        args.tenantId,
+        args.taskId,
+        'Reading file',
+      );
 
       if (controller.signal.aborted) {
-        await this.taskService.cancel(args.tenantId, args.taskId, args.userId, 'Cancelled');
+        await this.taskService.cancel(
+          args.tenantId,
+          args.taskId,
+          args.userId,
+          'Cancelled',
+        );
         return;
       }
 
       const markdown = await this.readFileText(args.file);
-      await this.taskService.updateProgress(args.tenantId, args.taskId, 30, 'Parsing markdown');
+      await this.taskService.updateProgress(
+        args.tenantId,
+        args.taskId,
+        30,
+        'Parsing markdown',
+      );
 
       const content = markdownToSlateValue(markdown);
       const parentIds = parseParentIds(args.req.parentIds);
-      const title = (args.req.title?.trim() || fileNameToTitle(args.file.originalname)).trim();
+      const title = (
+        args.req.title?.trim() || fileNameToTitle(args.file.originalname)
+      ).trim();
 
       if (controller.signal.aborted) {
-        await this.taskService.cancel(args.tenantId, args.taskId, args.userId, 'Cancelled');
+        await this.taskService.cancel(
+          args.tenantId,
+          args.taskId,
+          args.userId,
+          'Cancelled',
+        );
         return;
       }
 
-      await this.taskService.updateProgress(args.tenantId, args.taskId, 70, 'Creating page');
+      await this.taskService.updateProgress(
+        args.tenantId,
+        args.taskId,
+        70,
+        'Creating page',
+      );
 
       const created = await this.pageService.create(
         args.tenantId,
@@ -111,8 +149,17 @@ export class ImportsService {
         args.userId,
       );
 
-      await this.taskService.updateProgress(args.tenantId, args.taskId, 90, 'Publishing page');
-      const published = await this.pageService.publish(args.tenantId, created.id, args.userId);
+      await this.taskService.updateProgress(
+        args.tenantId,
+        args.taskId,
+        90,
+        'Publishing page',
+      );
+      const published = await this.pageService.publish(
+        args.tenantId,
+        created.id,
+        args.userId,
+      );
 
       await this.taskService.succeed(
         args.tenantId,
@@ -146,10 +193,19 @@ export class ImportsService {
     this.taskRuntime.registerAbortController(args.taskId, controller);
 
     try {
-      await this.taskService.markRunning(args.tenantId, args.taskId, 'Reading file');
+      await this.taskService.markRunning(
+        args.tenantId,
+        args.taskId,
+        'Reading file',
+      );
 
       if (controller.signal.aborted) {
-        await this.taskService.cancel(args.tenantId, args.taskId, args.userId, 'Cancelled');
+        await this.taskService.cancel(
+          args.tenantId,
+          args.taskId,
+          args.userId,
+          'Cancelled',
+        );
         return;
       }
 
@@ -158,7 +214,12 @@ export class ImportsService {
         throw new BadRequestException('invalid pdf');
       }
 
-      await this.taskService.updateProgress(args.tenantId, args.taskId, 20, 'Parsing PDF');
+      await this.taskService.updateProgress(
+        args.tenantId,
+        args.taskId,
+        20,
+        'Parsing PDF',
+      );
 
       const parser = new PDFParse({ data: pdfBuffer });
       let pages: string[] = [];
@@ -174,23 +235,45 @@ export class ImportsService {
       }
 
       if (controller.signal.aborted) {
-        await this.taskService.cancel(args.tenantId, args.taskId, args.userId, 'Cancelled');
+        await this.taskService.cancel(
+          args.tenantId,
+          args.taskId,
+          args.userId,
+          'Cancelled',
+        );
         return;
       }
 
       const markdown = pdfPagesToMarkdown(pages);
-      await this.taskService.updateProgress(args.tenantId, args.taskId, 60, 'Parsing markdown');
+      await this.taskService.updateProgress(
+        args.tenantId,
+        args.taskId,
+        60,
+        'Parsing markdown',
+      );
 
       const content = markdownToSlateValue(markdown);
       const parentIds = parseParentIds(args.req.parentIds);
-      const title = (args.req.title?.trim() || fileNameToTitle(args.file.originalname)).trim();
+      const title = (
+        args.req.title?.trim() || fileNameToTitle(args.file.originalname)
+      ).trim();
 
       if (controller.signal.aborted) {
-        await this.taskService.cancel(args.tenantId, args.taskId, args.userId, 'Cancelled');
+        await this.taskService.cancel(
+          args.tenantId,
+          args.taskId,
+          args.userId,
+          'Cancelled',
+        );
         return;
       }
 
-      await this.taskService.updateProgress(args.tenantId, args.taskId, 85, 'Creating page');
+      await this.taskService.updateProgress(
+        args.tenantId,
+        args.taskId,
+        85,
+        'Creating page',
+      );
 
       const created = await this.pageService.create(
         args.tenantId,
@@ -202,8 +285,17 @@ export class ImportsService {
         args.userId,
       );
 
-      await this.taskService.updateProgress(args.tenantId, args.taskId, 95, 'Publishing page');
-      const published = await this.pageService.publish(args.tenantId, created.id, args.userId);
+      await this.taskService.updateProgress(
+        args.tenantId,
+        args.taskId,
+        95,
+        'Publishing page',
+      );
+      const published = await this.pageService.publish(
+        args.tenantId,
+        created.id,
+        args.userId,
+      );
 
       await this.taskService.succeed(
         args.tenantId,
@@ -236,10 +328,19 @@ export class ImportsService {
     this.taskRuntime.registerAbortController(args.taskId, controller);
 
     try {
-      await this.taskService.markRunning(args.tenantId, args.taskId, 'Reading file');
+      await this.taskService.markRunning(
+        args.tenantId,
+        args.taskId,
+        'Reading file',
+      );
 
       if (controller.signal.aborted) {
-        await this.taskService.cancel(args.tenantId, args.taskId, args.userId, 'Cancelled');
+        await this.taskService.cancel(
+          args.tenantId,
+          args.taskId,
+          args.userId,
+          'Cancelled',
+        );
         return;
       }
 
@@ -249,31 +350,69 @@ export class ImportsService {
         throw new BadRequestException('invalid docx');
       }
 
-      await this.taskService.updateProgress(args.tenantId, args.taskId, 30, 'Parsing DOCX');
+      await this.taskService.updateProgress(
+        args.tenantId,
+        args.taskId,
+        30,
+        'Parsing DOCX',
+      );
 
-      const result = await (mammoth as unknown as { convertToMarkdown: (input: { buffer: Buffer }) => Promise<{ value: string }> }).convertToMarkdown({
+      const result = await (
+        mammoth as unknown as {
+          convertToMarkdown: (input: {
+            buffer: Buffer;
+          }) => Promise<{ value: string }>;
+        }
+      ).convertToMarkdown({
         buffer: docxBuffer,
       });
       const markdown = normalizeDocxMarkdown(result.value);
-      await this.taskService.updateProgress(args.tenantId, args.taskId, 55, 'Building markdown');
+      await this.taskService.updateProgress(
+        args.tenantId,
+        args.taskId,
+        55,
+        'Building markdown',
+      );
 
       if (controller.signal.aborted) {
-        await this.taskService.cancel(args.tenantId, args.taskId, args.userId, 'Cancelled');
+        await this.taskService.cancel(
+          args.tenantId,
+          args.taskId,
+          args.userId,
+          'Cancelled',
+        );
         return;
       }
 
-      await this.taskService.updateProgress(args.tenantId, args.taskId, 70, 'Parsing markdown');
+      await this.taskService.updateProgress(
+        args.tenantId,
+        args.taskId,
+        70,
+        'Parsing markdown',
+      );
 
       const content = markdownToSlateValue(markdown);
       const parentIds = parseParentIds(args.req.parentIds);
-      const title = (args.req.title?.trim() || fileNameToTitle(args.file.originalname)).trim();
+      const title = (
+        args.req.title?.trim() || fileNameToTitle(args.file.originalname)
+      ).trim();
 
       if (controller.signal.aborted) {
-        await this.taskService.cancel(args.tenantId, args.taskId, args.userId, 'Cancelled');
+        await this.taskService.cancel(
+          args.tenantId,
+          args.taskId,
+          args.userId,
+          'Cancelled',
+        );
         return;
       }
 
-      await this.taskService.updateProgress(args.tenantId, args.taskId, 85, 'Creating page');
+      await this.taskService.updateProgress(
+        args.tenantId,
+        args.taskId,
+        85,
+        'Creating page',
+      );
 
       const created = await this.pageService.create(
         args.tenantId,
@@ -285,8 +424,17 @@ export class ImportsService {
         args.userId,
       );
 
-      await this.taskService.updateProgress(args.tenantId, args.taskId, 95, 'Publishing page');
-      const published = await this.pageService.publish(args.tenantId, created.id, args.userId);
+      await this.taskService.updateProgress(
+        args.tenantId,
+        args.taskId,
+        95,
+        'Publishing page',
+      );
+      const published = await this.pageService.publish(
+        args.tenantId,
+        created.id,
+        args.userId,
+      );
 
       await this.taskService.succeed(
         args.tenantId,

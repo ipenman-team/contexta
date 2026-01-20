@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PageVersionStatus, type Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePageDto } from './dto/create-page.dto';
@@ -8,7 +12,7 @@ import { SavePageDto } from './dto/save-page.dto';
 
 @Injectable()
 export class PageService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   private normalizePageContent(input: unknown): Prisma.InputJsonValue {
     const defaultDoc = () =>
@@ -20,18 +24,21 @@ export class PageService {
       ] as unknown as Prisma.InputJsonValue;
 
     if (input == null) return defaultDoc();
-    if (Array.isArray(input)) return input.length > 0 ? (input as Prisma.InputJsonValue) : defaultDoc();
+    if (Array.isArray(input))
+      return input.length > 0 ? (input as Prisma.InputJsonValue) : defaultDoc();
 
     if (typeof input === 'string') {
       const trimmed = input.trim();
       if (!trimmed) return defaultDoc();
       try {
-        const parsed = JSON.parse(trimmed);
+        const parsed: unknown = JSON.parse(trimmed);
         if (Array.isArray(parsed)) {
-          return parsed.length > 0 ? (parsed as Prisma.InputJsonValue) : defaultDoc();
+          return parsed.length > 0
+            ? (parsed as Prisma.InputJsonValue)
+            : defaultDoc();
         }
       } catch {
-        // ignore
+        void 0;
       }
 
       return [
@@ -68,7 +75,11 @@ export class PageService {
     });
   }
 
-  async create(tenantId: string, input: CreatePageDto, userId?: string): Promise<PageDto> {
+  async create(
+    tenantId: string,
+    input: CreatePageDto,
+    userId?: string,
+  ): Promise<PageDto> {
     if (!tenantId) throw new BadRequestException('tenantId is required');
     if (!input.title) throw new BadRequestException('title is required');
 
@@ -101,7 +112,12 @@ export class PageService {
     return created;
   }
 
-  async save(tenantId: string, id: string, input: SavePageDto, userId?: string): Promise<PageDto> {
+  async save(
+    tenantId: string,
+    id: string,
+    input: SavePageDto,
+    userId?: string,
+  ): Promise<PageDto> {
     if (!id) throw new BadRequestException('id is required');
     if (!tenantId) throw new BadRequestException('tenantId is required');
 
@@ -138,6 +154,56 @@ export class PageService {
       parentIds: updated.parentIds,
       userId: actor,
     });
+
+    return updated;
+  }
+
+  async rename(
+    tenantId: string,
+    id: string,
+    input: { title: string },
+    userId?: string,
+  ): Promise<PageDto> {
+    if (!id) throw new BadRequestException('id is required');
+    if (!tenantId) throw new BadRequestException('tenantId is required');
+
+    const actor = userId?.trim() || 'system';
+
+    const existing = await this.prisma.page.findFirst({
+      where: { id, tenantId },
+    });
+    if (!existing) throw new NotFoundException('page not found');
+
+    const nextTitle = input.title?.trim() || '无标题文档';
+
+    const updated = await this.prisma.page.update({
+      where: { id },
+      data: {
+        title: nextTitle,
+        updatedBy: actor,
+      },
+    });
+
+    const latestPublished = await this.prisma.pageVersion.findFirst({
+      where: {
+        tenantId,
+        pageId: updated.id,
+        status: PageVersionStatus.PUBLISHED,
+        isDeleted: false,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+
+    if (latestPublished) {
+      await this.prisma.pageVersion.update({
+        where: { id: latestPublished.id },
+        data: {
+          title: updated.title,
+          updatedBy: actor,
+        },
+      });
+    }
 
     return updated;
   }
@@ -204,7 +270,10 @@ export class PageService {
     return latest;
   }
 
-  async listVersions(pageId: string, tenantId: string): Promise<PageVersionDto[]> {
+  async listVersions(
+    pageId: string,
+    tenantId: string,
+  ): Promise<PageVersionDto[]> {
     if (!pageId) throw new BadRequestException('id is required');
     if (!tenantId) throw new BadRequestException('tenantId is required');
 
@@ -259,7 +328,7 @@ export class PageService {
     return version;
   }
 
-  async remove(id: string, tenantId: string): Promise<{ ok: true }>{
+  async remove(id: string, tenantId: string): Promise<{ ok: true }> {
     if (!id) throw new BadRequestException('id is required');
     if (!tenantId) throw new BadRequestException('tenantId is required');
 
@@ -284,12 +353,13 @@ export class PageService {
     return page;
   }
 
-  async list(tenantId: string): Promise<PageDto[]> {
+  async list(tenantId: string): Promise<(Omit<PageDto, 'content'>)[]> {
     if (!tenantId) throw new BadRequestException('tenantId is required');
 
     return this.prisma.page.findMany({
       where: { tenantId },
       orderBy: { updatedAt: 'desc' },
+      omit: { content: true },
     });
   }
 }

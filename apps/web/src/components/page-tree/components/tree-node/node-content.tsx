@@ -37,6 +37,7 @@ export const TreeNodeContent = memo(function TreeNodeContent({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if ((e.nativeEvent as { isComposing?: boolean }).isComposing) return;
       if (e.key === 'Enter') {
         e.preventDefault();
         e.stopPropagation();

@@ -13,9 +13,7 @@ export function parseParentIds(input: unknown): string[] {
   if (input == null) return [];
 
   if (Array.isArray(input)) {
-    return input
-      .map((x) => String(x).trim())
-      .filter(Boolean);
+    return input.map((x) => String(x).trim()).filter(Boolean);
   }
 
   if (typeof input === 'string') {
@@ -25,7 +23,7 @@ export function parseParentIds(input: unknown): string[] {
     // Prefer JSON array
     if (trimmed.startsWith('[')) {
       try {
-        const parsed = JSON.parse(trimmed);
+        const parsed: unknown = JSON.parse(trimmed);
         if (Array.isArray(parsed)) return parseParentIds(parsed);
       } catch {
         // fallthrough
@@ -50,7 +48,9 @@ function normalizeDocxUnindentedListLevels(markdown: string): string {
 
   const isRoman = (s: string) => /^[ivxlcdm]+$/i.test(s);
 
-  const orderedLevelType = (marker: string): 'digit' | 'alpha' | 'roman' | 'other' => {
+  const orderedLevelType = (
+    marker: string,
+  ): 'digit' | 'alpha' | 'roman' | 'other' => {
     if (/^\d+$/.test(marker)) return 'digit';
     if (/^[a-zA-Z]$/.test(marker)) return 'alpha';
     if (isRoman(marker)) return 'roman';
@@ -90,14 +90,22 @@ function normalizeDocxUnindentedListLevels(markdown: string): string {
 
       const b = current.match(bulletRe);
       if (b) {
-        run.push({ kind: 'bullet', marker: b[1] ?? '-', text: String(b[2] ?? '') });
+        run.push({
+          kind: 'bullet',
+          marker: b[1] ?? '-',
+          text: String(b[2] ?? ''),
+        });
         i += 1;
         continue;
       }
 
       const o = current.match(orderedRe);
       if (o) {
-        run.push({ kind: 'ordered', marker: o[1] ?? '1', text: String(o[2] ?? '') });
+        run.push({
+          kind: 'ordered',
+          marker: o[1] ?? '1',
+          text: String(o[2] ?? ''),
+        });
         i += 1;
         continue;
       }

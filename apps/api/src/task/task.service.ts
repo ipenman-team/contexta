@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { TaskStatus, type Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TaskRuntimeService } from './task.runtime.service';
@@ -17,7 +21,11 @@ export class TaskService {
     private readonly taskRuntime: TaskRuntimeService,
   ) {}
 
-  async create(tenantId: string, userId: string, input: CreateTaskInput): Promise<TaskDto> {
+  async create(
+    tenantId: string,
+    userId: string,
+    input: CreateTaskInput,
+  ): Promise<TaskDto> {
     if (!tenantId) throw new BadRequestException('tenantId is required');
     if (!userId) throw new BadRequestException('userId is required');
 
@@ -69,7 +77,12 @@ export class TaskService {
     return task;
   }
 
-  async updateProgress(tenantId: string, id: string, progress: number, message?: string) {
+  async updateProgress(
+    tenantId: string,
+    id: string,
+    progress: number,
+    message?: string,
+  ) {
     const normalized = Math.max(0, Math.min(100, Math.trunc(progress)));
 
     await this.prisma.task.updateMany({
@@ -90,7 +103,12 @@ export class TaskService {
     return task;
   }
 
-  async succeed(tenantId: string, id: string, result?: unknown, message?: string) {
+  async succeed(
+    tenantId: string,
+    id: string,
+    result?: unknown,
+    message?: string,
+  ) {
     await this.prisma.task.updateMany({
       where: {
         id,

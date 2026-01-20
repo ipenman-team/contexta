@@ -100,10 +100,8 @@ export function MainContent(props: {
   if (props.selected.kind === 'page') {
     const isPreview = props.pageMode === 'preview';
     const previewTitle = props.publishedSnapshot?.title ?? props.pageTitle;
-    const previewValue = isPreview
-      ? props.publishedSnapshot
-        ? parseContentToSlateValue(props.publishedSnapshot.content)
-        : props.editorValue
+    const previewValue = props.publishedSnapshot
+      ? parseContentToSlateValue(props.publishedSnapshot.content)
       : props.editorValue;
 
     const previewEditorKey = `${props.activePageId ?? props.selected.id}-preview-${props.activePageId ? 'loaded' : 'loading'}-${props.publishedSnapshot?.updatedAt ?? 'none'}`;

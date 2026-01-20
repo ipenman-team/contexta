@@ -3,11 +3,67 @@ import { pagesApi, type PageDto } from '@/lib/api';
 import { buildPageTreeFromFlatPages } from '@contexta/shared';
 import {
   usePageTreeStore,
+  usePageContentStore,
   usePageSelectionStore,
   useUIStateStore,
   useCreatingPage,
 } from '@/stores';
 import type { TreeNode } from '@/components/shared/tree';
+
+export async function commitRenameFromState(args: {
+  refreshPages: () => Promise<void>;
+  setSelectedPage: (id: string, title: string) => void;
+}) {
+  const { renamingTarget, renamingValue, setSavingRename, cancelRename } =
+    useUIStateStore.getState();
+  if (!renamingTarget) return;
+
+  const nextTitle = renamingValue.trim() || '无标题文档';
+
+  try {
+    setSavingRename(true);
+    const page = await pagesApi.rename(renamingTarget.id, {
+      title: nextTitle,
+    });
+
+    const { selected } = usePageSelectionStore.getState();
+    if (selected.kind === 'page' && selected.id === page.id) {
+      args.setSelectedPage(page.id, page.title);
+
+      const {
+        activePage,
+        setActivePage,
+        setPageTitle,
+        publishedSnapshot,
+        setPublishedSnapshot,
+        setVersionsLoading,
+        setPageVersions,
+      } = usePageContentStore.getState();
+
+      if (activePage?.id === page.id) {
+        setActivePage(page);
+        setPageTitle(page.title);
+
+        if (publishedSnapshot) {
+          setPublishedSnapshot({ ...publishedSnapshot, title: page.title });
+        }
+      }
+
+      try {
+        setVersionsLoading(true);
+        const versions = await pagesApi.listVersions(page.id);
+        setPageVersions(versions);
+      } finally {
+        setVersionsLoading(false);
+      }
+    }
+
+    await args.refreshPages();
+    cancelRename();
+  } finally {
+    setSavingRename(false);
+  }
+}
 
 /**
  * 页面树 CRUD 操作 Hook
@@ -20,9 +76,6 @@ export function usePageTreeCRUD() {
   const { setPageTreeNodes, setPagesLoaded, setCreatingPage } =
     usePageTreeStore();
   const { setSelectedPage } = usePageSelectionStore();
-  const { setSavingRename, cancelRename } = useUIStateStore();
-  const renamingTarget = useUIStateStore((s) => s.renamingTarget);
-  const renamingValue = useUIStateStore((s) => s.renamingValue);
 
   // 刷新页面树
   const refreshPages = useCallback(async () => {
@@ -68,36 +121,14 @@ export function usePageTreeCRUD() {
   );
 
   // 提交重命名
-  const commitRename = useCallback(async () => {
-    if (!renamingTarget) return;
-
-    const nextTitle = renamingValue.trim() || '无标题文档';
-
-    try {
-      setSavingRename(true);
-      const page = await pagesApi.save(renamingTarget.id, {
-        title: nextTitle,
-      });
-
-      // 如果正在重命名当前选中的页面，更新选择状态
-      const { selected } = usePageSelectionStore.getState();
-      if (selected.kind === 'page' && selected.id === page.id) {
-        setSelectedPage(page.id, page.title);
-      }
-
-      await refreshPages();
-      cancelRename();
-    } finally {
-      setSavingRename(false);
-    }
-  }, [
-    renamingTarget,
-    renamingValue,
-    setSavingRename,
-    setSelectedPage,
-    refreshPages,
-    cancelRename,
-  ]);
+  const commitRename = useCallback(
+    async () =>
+      commitRenameFromState({
+        refreshPages,
+        setSelectedPage,
+      }),
+    [refreshPages, setSelectedPage]
+  );
 
   // 初始加载页面树
   useEffect(() => {

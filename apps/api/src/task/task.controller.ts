@@ -18,13 +18,14 @@ export class TaskController {
   }
 
   @Sse(':id/events')
-  events(@TenantId() tenantId: string, @Param('id') id: string): Observable<MessageEvent> {
+  events(
+    @TenantId() tenantId: string,
+    @Param('id') id: string,
+  ): Observable<MessageEvent> {
     const initial$ = from(this.taskService.get(tenantId, id));
     const updates$ = this.taskRuntime.observe(id);
 
-    return concat(initial$, updates$).pipe(
-      map((task) => ({ data: task })),
-    );
+    return concat(initial$, updates$).pipe(map((task) => ({ data: task })));
   }
 
   @Post(':id/cancel')
@@ -35,7 +36,12 @@ export class TaskController {
   ) {
     const actor = userId?.trim() || 'system';
     this.taskRuntime.abort(id);
-    const task = await this.taskService.cancel(tenantId, id, actor, 'Cancelled');
+    const task = await this.taskService.cancel(
+      tenantId,
+      id,
+      actor,
+      'Cancelled',
+    );
     return { ok: true, task };
   }
 }

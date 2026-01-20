@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 // Components
@@ -28,6 +28,7 @@ import {
 import {
   useUrlSync,
   usePageLoader,
+  usePublishedPageLoader,
   usePageAutoSave,
   useTaskSubscription,
 } from '@/hooks';
@@ -46,6 +47,7 @@ export function HomeScreen(props: {
   initialSelectedViewId?: ViewId;
 } = {}) {
   const router = useRouter();
+  const pathname = usePathname();
 
   // Initialize selection from props
   const { setSelected } = usePageSelectionStore();
@@ -66,7 +68,13 @@ export function HomeScreen(props: {
 
   // Custom hooks handle complex logic
   useUrlSync();
-  usePageLoader(selectedPageId);
+  const isEditRoute = pathname.startsWith('/pages/') && pathname.endsWith('/edit');
+  usePageLoader(selectedPageId, {
+    enabled: isEditRoute,
+    mode: 'edit',
+    loadPublishedSnapshot: false,
+  });
+  usePublishedPageLoader(selectedPageId, { enabled: !isEditRoute });
   usePageAutoSave();
   const { subscribeTaskEvents } = useTaskSubscription();
 
@@ -94,8 +102,7 @@ export function HomeScreen(props: {
   const editorValue = usePageContentStore((s) => s.editorValue);
   const pageVersions = usePageContentStore((s) => s.pageVersions);
   const versionsLoading = usePageContentStore((s) => s.versionsLoading);
-  const { setPageMode, setPagePublishing, setPublishedSnapshot, setEditorValue, setPageTitle } =
-    usePageContentStore();
+  const { setPagePublishing, setEditorValue, setPageTitle } = usePageContentStore();
 
   // Task state
   const tasks = useTaskStore((s) => s.tasks);
@@ -132,17 +139,11 @@ export function HomeScreen(props: {
     try {
       setPagePublishing(true);
       await pagesApi.publish(activePage.id);
-      const published = await pagesApi.getLatestPublished(activePage.id);
-      setPublishedSnapshot({
-        title: published.title,
-        content: published.content,
-        updatedBy: published.updatedBy,
-        updatedAt: published.updatedAt,
-      });
+      router.push(`/pages/${encodeURIComponent(activePage.id)}`);
     } finally {
       setPagePublishing(false);
     }
-  }, [activePage, pagePublishing, setPagePublishing, setPublishedSnapshot]);
+  }, [activePage, pagePublishing, router, setPagePublishing]);
 
   // Task handlers
   const createTaskId = useCallback(() => {
@@ -409,7 +410,7 @@ export function HomeScreen(props: {
       <PageTopbar
         visible={selected.kind === 'page'}
         pageMode={pageMode}
-        activePageExists={!!activePage}
+        activePageExists={selected.kind === 'page'}
         pageTitle={pageTitle}
         publishedTitle={publishedSnapshot?.title ?? null}
         pageLoading={pageLoading}
@@ -419,10 +420,13 @@ export function HomeScreen(props: {
         openMore={openPageMore}
         setOpenMore={setOpenPageMore}
         onCloseEdit={() => {
-          if (!activePage) return;
-          setPageMode('preview');
+          if (!selectedPageId) return;
+          router.push(`/pages/${encodeURIComponent(selectedPageId)}`);
         }}
-        onEnterEdit={() => setPageMode('edit')}
+        onEnterEdit={() => {
+          if (!selectedPageId) return;
+          router.push(`/pages/${encodeURIComponent(selectedPageId)}/edit`);
+        }}
         onPublish={handlePublish}
         onOpenHistory={() => {
           if (!selectedPageId) return;

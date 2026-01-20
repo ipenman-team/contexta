@@ -1,4 +1,7 @@
-import { markdownToSlateValue, slateToPlainText } from '@contexta/slate-converters';
+import {
+  markdownToSlateValue,
+  slateToPlainText,
+} from '@contexta/slate-converters';
 
 describe('markdownToSlateValue inline parsing', () => {
   it('parses long text with paired backticks', () => {

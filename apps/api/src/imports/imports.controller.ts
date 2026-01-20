@@ -32,7 +32,8 @@ export class ImportsController {
     @TenantId() tenantId: string,
     @Headers('x-user-id') userId: string | undefined,
     @Body() body: ImportRequest,
-    @UploadedFile() file: { buffer?: Buffer; path?: string; originalname?: string } | undefined,
+    @UploadedFile()
+    file: { buffer?: Buffer; path?: string; originalname?: string } | undefined,
   ) {
     const actor = userId?.trim() || 'system';
 
@@ -40,7 +41,12 @@ export class ImportsController {
       throw new BadRequestException('file is required');
     }
 
-    const task = await this.importsService.createImportTask(tenantId, actor, body, file.originalname);
+    const task = await this.importsService.createImportTask(
+      tenantId,
+      actor,
+      body,
+      file.originalname,
+    );
 
     const format = String(body?.format ?? 'markdown').toLowerCase();
     if (format === 'markdown') {

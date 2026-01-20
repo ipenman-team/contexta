@@ -65,7 +65,11 @@ export class RagService {
     });
   }
 
-  answerStream(tenantId: string, question: string, options?: { signal?: AbortSignal }) {
+  answerStream(
+    tenantId: string,
+    question: string,
+    options?: { signal?: AbortSignal },
+  ) {
     const q = question?.trim() ?? '';
     if (!q) throw new BadRequestException('question is required');
 

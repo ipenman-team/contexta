@@ -31,6 +31,14 @@ export const pagesApi = {
     return res.data;
   },
 
+  async rename(id: string, input: { title: string }) {
+    const res = await apiClient.post<PageDto>(
+      `/pages/${encodeURIComponent(id)}/rename`,
+      input,
+    );
+    return res.data;
+  },
+
   async save(id: string, input: SavePageInput) {
     const res = await apiClient.put<PageDto>(`/pages/${encodeURIComponent(id)}`, input);
     return res.data;
