@@ -16,6 +16,16 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
+import {
+  canIndentListItem,
+  handleEnterInList,
+  indentListItem,
+  isInListItem,
+  isListActive,
+  outdentListItem,
+  toggleList,
+} from "./list-commands";
+
 export type SlateValue = Descendant[];
 
 type BlockFormat =
@@ -130,13 +140,19 @@ function Element(props: RenderElementProps) {
       );
     case "bulleted-list":
       return (
-        <ul {...attributes} className="my-2 list-disc pl-6">
+        <ul
+          {...attributes}
+          className="my-2 list-disc pl-6 [&_ul]:list-[circle] [&_ul_ul]:list-[square] [&_ul_ul_ul]:list-disc"
+        >
           {children}
         </ul>
       );
     case "numbered-list":
       return (
-        <ol {...attributes} className="my-2 list-decimal pl-6">
+        <ol
+          {...attributes}
+          className="my-2 list-decimal pl-6 [&_ol]:list-[lower-alpha] [&_ol_ol]:list-[lower-roman] [&_ol_ol_ol]:list-decimal"
+        >
           {children}
         </ol>
       );
@@ -180,6 +196,11 @@ function toggleBlock(editor: Editor, format: BlockFormat) {
   const isActive = isBlockActive(editor, format);
   const isList = LIST_TYPES.includes(format);
 
+  if (isList) {
+    toggleList(editor, format as Extract<BlockFormat, "numbered-list" | "bulleted-list">);
+    return;
+  }
+
   Transforms.unwrapNodes(editor, {
     match: (n) =>
       !Editor.isEditor(n) &&
@@ -188,20 +209,10 @@ function toggleBlock(editor: Editor, format: BlockFormat) {
     split: true,
   });
 
-  const nextType = isActive ? "paragraph" : isList ? "list-item" : format;
+  const nextType = isActive ? "paragraph" : format;
   Transforms.setNodes(editor, { type: nextType } as unknown as Partial<SlateElement>, {
     match: (n) => !Editor.isEditor(n) && SlateElement.isElement(n),
   });
-
-  if (!isActive && isList) {
-    const block = { type: format, children: [] } as unknown as SlateElement;
-    Transforms.wrapNodes(editor, block, {
-      match: (n) =>
-        !Editor.isEditor(n) &&
-        SlateElement.isElement(n) &&
-        (n as SlateElement & { type?: string }).type === "list-item",
-    });
-  }
 }
 
 function ToolbarButton(props: {
@@ -317,20 +328,20 @@ function EditorToolbar(props: { disabled?: boolean }) {
 
       <ToolbarButton
         label="•"
-        active={isBlockActive(editor, "bulleted-list")}
+        active={isListActive(editor, "bulleted-list")}
         disabled={disabled}
         onMouseDown={(e) => {
           e.preventDefault();
-          toggleBlock(editor, "bulleted-list");
+          toggleList(editor, "bulleted-list");
         }}
       />
       <ToolbarButton
         label="1."
-        active={isBlockActive(editor, "numbered-list")}
+        active={isListActive(editor, "numbered-list")}
         disabled={disabled}
         onMouseDown={(e) => {
           e.preventDefault();
-          toggleBlock(editor, "numbered-list");
+          toggleList(editor, "numbered-list");
         }}
       />
     </div>
@@ -377,6 +388,22 @@ export function SlateEditor(props: {
         renderLeaf={renderLeaf}
         readOnly={props.disabled || readOnly}
         onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            if (!handleEnterInList(editor)) return;
+            e.preventDefault();
+            return;
+          }
+
+          if (e.key === "Tab") {
+            const canIndent = canIndentListItem(editor);
+            if (!isInListItem(editor)) return;
+
+            e.preventDefault();
+            if (e.shiftKey) outdentListItem(editor);
+            else if (canIndent) indentListItem(editor);
+            return;
+          }
+
           const isMod = e.metaKey || e.ctrlKey;
           if (!isMod) return;
 
