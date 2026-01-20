@@ -61,11 +61,12 @@ export const PageTreeItem = memo(
       setOpenMenuNodeId(isMenuOpen ? null : node.id);
     }, [isMenuOpen, node.id, setOpenMenuNodeId]);
 
-    const handleCreateChild = useCallback(() => {
+    const handleCreateChildFromMenu = useCallback(() => {
+      setOpenMenuNodeId(null);
       if (onCreateChildPage) {
         onCreateChildPage(node);
       }
-    }, [node, onCreateChildPage]);
+    }, [node, onCreateChildPage, setOpenMenuNodeId]);
 
     const handleRename = useCallback(() => {
       setOpenMenuNodeId(null);
@@ -86,7 +87,7 @@ export const PageTreeItem = memo(
 
     return (
       <div
-        className="group flex items-center"
+        className="group flex min-w-0 items-center"
         style={{ paddingLeft: 8 + depth * 14 }}
       >
         <TreeNodeExpandButton
@@ -105,7 +106,6 @@ export const PageTreeItem = memo(
 
         <TreeNodeActions
           nodeId={node.id}
-          onCreateChild={handleCreateChild}
           onToggleMenu={handleToggleMenu}
         />
 
@@ -114,6 +114,7 @@ export const PageTreeItem = memo(
             nodeId={node.id}
             label={node.label}
             isOpen={isMenuOpen}
+            onCreateChild={handleCreateChildFromMenu}
             onRename={handleRename}
             onDelete={handleDelete}
             onClose={() => setOpenMenuNodeId(null)}

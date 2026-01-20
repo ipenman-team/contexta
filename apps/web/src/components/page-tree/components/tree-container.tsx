@@ -1,6 +1,5 @@
 import { memo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { Tree } from '@/components/shared/tree';
 import { PageTreeHeader } from './tree-header';
 import { PageTreeItem } from './tree-item';
@@ -67,8 +66,6 @@ export const PageTreeContainer = memo(function PageTreeContainer({
           />
         )}
       />
-
-      <Separator />
     </>
   );
 });

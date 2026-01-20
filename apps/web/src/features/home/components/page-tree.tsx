@@ -1,6 +1,6 @@
 import { Tree, type TreeNode } from "@/components/shared/tree";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import { TreeNodeContextMenu } from "@/components/page-tree/components/tree-node/context-menu";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 
@@ -116,7 +116,7 @@ export function PageTree<T>(props: {
             const isRenaming = props.renamingTargetId === node.id;
 
             return (
-              <div className="group flex items-center" style={{ paddingLeft: 8 + depth * 14 }}>
+              <div className="group flex min-w-0 items-center" style={{ paddingLeft: 8 + depth * 14 }}>
                 {hasChildren ? (
                   <Button
                     type="button"
@@ -138,7 +138,7 @@ export function PageTree<T>(props: {
                 {isRenaming ? (
                   <input
                     className={cn(
-                      "h-9 w-full flex-1 rounded-md border bg-background px-2 text-sm",
+                      "h-9 flex-1 min-w-0 rounded-md border bg-background px-2 text-sm",
                       "border-input focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                     )}
                     value={props.renamingValue}
@@ -165,7 +165,7 @@ export function PageTree<T>(props: {
                     type="button"
                     variant="ghost"
                     className={cn(
-                      "h-9 w-full flex-1 justify-start px-2",
+                      "h-9 flex-1 min-w-0 justify-start px-2",
                       isSelected && "bg-accent text-accent-foreground",
                     )}
                     onClick={() => props.onSelectPage(node.id, node.label)}
@@ -177,29 +177,16 @@ export function PageTree<T>(props: {
                 {!isRenaming ? (
                   <div
                     className={cn(
-                      "ml-1 flex items-center gap-0.5",
+                      "ml-1 flex shrink-0 items-center gap-0.5",
                       "opacity-0 transition-opacity group-hover:opacity-100",
                     )}
                   >
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-7 w-7 px-0 text-muted-foreground"
-                      aria-label="新建子页面"
-                      disabled={props.creatingPage}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        props.onCreateChildPage(node);
-                      }}
-                    >
-                      +
-                    </Button>
-
                     <div className="relative">
                       <Button
                         type="button"
                         variant="ghost"
                         className="h-7 w-7 px-0 text-muted-foreground"
+                        data-node-menu-trigger={node.id}
                         aria-label="更多"
                         aria-expanded={props.openMenuNodeId === node.id}
                         onPointerDown={(e) => {
@@ -210,42 +197,25 @@ export function PageTree<T>(props: {
                         …
                       </Button>
 
-                      {props.openMenuNodeId === node.id ? (
-                        <div
-                          className={cn(
-                            "absolute right-0 top-8 z-50 w-28 overflow-hidden rounded-md border bg-popover text-popover-foreground",
-                          )}
-                          onPointerDown={(e) => e.stopPropagation()}
-                        >
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="h-9 w-full justify-start rounded-none px-2"
-                            onPointerDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              props.onToggleNodeMenu(null);
-                              props.onSelectPage(node.id, node.label);
-                              props.onRenameStart(node.id, node.label);
-                            }}
-                          >
-                            重命名
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="h-9 w-full justify-start rounded-none px-2 text-destructive"
-                            onPointerDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              props.onToggleNodeMenu(null);
-                              props.onDeleteRequest(node.id, node.label);
-                            }}
-                          >
-                            删除
-                          </Button>
-                        </div>
-                      ) : null}
+                      <TreeNodeContextMenu
+                        nodeId={node.id}
+                        label={node.label}
+                        isOpen={props.openMenuNodeId === node.id}
+                        onCreateChild={() => {
+                          props.onToggleNodeMenu(null);
+                          props.onCreateChildPage(node);
+                        }}
+                        onRename={() => {
+                          props.onToggleNodeMenu(null);
+                          props.onSelectPage(node.id, node.label);
+                          props.onRenameStart(node.id, node.label);
+                        }}
+                        onDelete={() => {
+                          props.onToggleNodeMenu(null);
+                          props.onDeleteRequest(node.id, node.label);
+                        }}
+                        onClose={() => props.onToggleNodeMenu(null)}
+                      />
                     </div>
                   </div>
                 ) : null}
@@ -254,8 +224,6 @@ export function PageTree<T>(props: {
           }}
         />
       )}
-
-      <Separator />
     </>
   );
 }

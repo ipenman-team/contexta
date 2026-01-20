@@ -20,28 +20,36 @@ export const PageSidebar = memo(function PageSidebar({
 
   return (
     <aside className="w-72 border-r bg-muted/30">
-      <div className="flex h-dvh flex-col gap-4 overflow-auto p-3">
-        <SidebarItem
-          label="仪表盘"
-          active={selected.kind === 'view' && selected.id === 'dashboard'}
-          onClick={() => handleSelectView('dashboard')}
-        />
+      <div className="flex h-dvh flex-col overflow-hidden p-3">
+        <div className="flex flex-col gap-4">
+          <SidebarItem
+            label="仪表盘"
+            active={selected.kind === 'view' && selected.id === 'dashboard'}
+            onClick={() => handleSelectView('dashboard')}
+          />
 
-        <SidebarItem
-          label="ContextA AI"
-          active={selected.kind === 'view' && selected.id === 'contexta-ai'}
-          onClick={() => handleSelectView('contexta-ai')}
-        />
+          <SidebarItem
+            label="ContextA AI"
+            active={selected.kind === 'view' && selected.id === 'contexta-ai'}
+            onClick={() => handleSelectView('contexta-ai')}
+          />
+
+          <Separator />
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-auto py-4">
+          <PageTreeContainer onOpenImport={onOpenImport} />
+        </div>
 
         <Separator />
 
-        <PageTreeContainer onOpenImport={onOpenImport} />
-
-        <SidebarItem
-          label="设置"
-          active={selected.kind === 'view' && selected.id === 'settings'}
-          onClick={() => handleSelectView('settings')}
-        />
+        <div className="pt-4">
+          <SidebarItem
+            label="设置"
+            active={selected.kind === 'view' && selected.id === 'settings'}
+            onClick={() => handleSelectView('settings')}
+          />
+        </div>
       </div>
     </aside>
   );

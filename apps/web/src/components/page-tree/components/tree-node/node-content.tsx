@@ -56,7 +56,7 @@ export const TreeNodeContent = memo(function TreeNodeContent({
     return (
       <input
         className={cn(
-          'h-9 w-full flex-1 rounded-md border bg-background px-2 text-sm',
+          'h-9 flex-1 min-w-0 rounded-md border bg-background px-2 text-sm',
           'border-input focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
         )}
         value={renamingValue}
@@ -76,7 +76,7 @@ export const TreeNodeContent = memo(function TreeNodeContent({
       type="button"
       variant="ghost"
       className={cn(
-        'h-9 w-full flex-1 justify-start px-2',
+        'h-9 flex-1 min-w-0 justify-start px-2',
         isSelected && 'bg-accent text-accent-foreground'
       )}
       onClick={onSelect}

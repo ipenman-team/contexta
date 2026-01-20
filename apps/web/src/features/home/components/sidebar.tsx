@@ -28,47 +28,55 @@ export function Sidebar<T>(props: {
 }) {
   return (
     <aside className="w-72 border-r bg-muted/30">
-      <div className="flex h-dvh flex-col gap-4 overflow-auto p-3">
-        <SidebarItem
-          label="仪表盘"
-          active={props.selected.kind === "view" && props.selected.id === "dashboard"}
-          onClick={() => props.onSelectView("dashboard")}
-        />
+      <div className="flex h-dvh flex-col overflow-hidden p-3">
+        <div className="flex flex-col gap-4">
+          <SidebarItem
+            label="仪表盘"
+            active={props.selected.kind === "view" && props.selected.id === "dashboard"}
+            onClick={() => props.onSelectView("dashboard")}
+          />
 
-        <SidebarItem
-          label="ContextA AI"
-          active={props.selected.kind === "view" && props.selected.id === "contexta-ai"}
-          onClick={() => props.onSelectView("contexta-ai")}
-        />
+          <SidebarItem
+            label="ContextA AI"
+            active={props.selected.kind === "view" && props.selected.id === "contexta-ai"}
+            onClick={() => props.onSelectView("contexta-ai")}
+          />
+
+          <Separator />
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-auto py-4">
+          <PageTree
+            nodes={props.nodes}
+            selectedId={props.selected.kind === "page" ? props.selected.id : undefined}
+            pagesLoaded={props.pagesLoaded}
+            creatingPage={props.creatingPage}
+            renamingTargetId={props.renamingTargetId}
+            renamingValue={props.renamingValue}
+            savingRename={props.savingRename}
+            openMenuNodeId={props.openMenuNodeId}
+            onCreatePage={props.onCreatePage}
+            onOpenImport={props.onOpenImport}
+            onCreateChildPage={props.onCreateChildPage}
+            onSelectPage={props.onSelectPage}
+            onToggleNodeMenu={props.onToggleNodeMenu}
+            onRenameStart={props.onRenameStart}
+            onRenameValueChange={props.onRenameValueChange}
+            onRenameCommit={props.onRenameCommit}
+            onRenameCancel={props.onRenameCancel}
+            onDeleteRequest={props.onDeleteRequest}
+          />
+        </div>
 
         <Separator />
 
-        <PageTree
-          nodes={props.nodes}
-          selectedId={props.selected.kind === "page" ? props.selected.id : undefined}
-          pagesLoaded={props.pagesLoaded}
-          creatingPage={props.creatingPage}
-          renamingTargetId={props.renamingTargetId}
-          renamingValue={props.renamingValue}
-          savingRename={props.savingRename}
-          openMenuNodeId={props.openMenuNodeId}
-          onCreatePage={props.onCreatePage}
-          onOpenImport={props.onOpenImport}
-          onCreateChildPage={props.onCreateChildPage}
-          onSelectPage={props.onSelectPage}
-          onToggleNodeMenu={props.onToggleNodeMenu}
-          onRenameStart={props.onRenameStart}
-          onRenameValueChange={props.onRenameValueChange}
-          onRenameCommit={props.onRenameCommit}
-          onRenameCancel={props.onRenameCancel}
-          onDeleteRequest={props.onDeleteRequest}
-        />
-
-        <SidebarItem
-          label="设置"
-          active={props.selected.kind === "view" && props.selected.id === "settings"}
-          onClick={() => props.onSelectView("settings")}
-        />
+        <div className="pt-4">
+          <SidebarItem
+            label="设置"
+            active={props.selected.kind === "view" && props.selected.id === "settings"}
+            onClick={() => props.onSelectView("settings")}
+          />
+        </div>
       </div>
     </aside>
   );
