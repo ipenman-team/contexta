@@ -1,0 +1,70 @@
+import { ImportsService } from '../../imports.service';
+import { TaskService } from '../../../task/task.service';
+import { TaskRuntimeService } from '../../../task/task.runtime.service';
+import { PageService } from '../../../page/page.service';
+
+describe('ImportsService markdown nested lists', () => {
+  it('creates page content with nested list nodes', async () => {
+    const taskService: Partial<Record<keyof TaskService, unknown>> = {
+      markRunning: jest.fn().mockResolvedValue(undefined),
+      updateProgress: jest.fn().mockResolvedValue(undefined),
+      cancel: jest.fn().mockResolvedValue(undefined),
+      succeed: jest.fn().mockResolvedValue(undefined),
+      fail: jest.fn().mockResolvedValue(undefined),
+      get: jest.fn().mockResolvedValue({ status: 'RUNNING' }),
+    };
+
+    const taskRuntime: Partial<Record<keyof TaskRuntimeService, unknown>> = {
+      registerAbortController: jest.fn(),
+      unregisterAbortController: jest.fn(),
+    };
+
+    const pageService: Partial<Record<keyof PageService, unknown>> = {
+      create: jest.fn().mockResolvedValue({ id: 'p1' }),
+      publish: jest.fn().mockResolvedValue({ versionId: 'v1' }),
+    };
+
+    const service = new ImportsService(
+      taskService as TaskService,
+      taskRuntime as TaskRuntimeService,
+      pageService as PageService,
+    );
+
+    const markdown = ['- A', '  - B', '    - C', '- D', ''].join('\n');
+
+    const runner = service as unknown as {
+      runMarkdownImport: (args: {
+        tenantId: string;
+        userId: string;
+        taskId: string;
+        req: { format: string; title: string; parentIds: unknown };
+        file: { buffer: Buffer; originalname: string };
+      }) => Promise<void>;
+    };
+
+    await runner.runMarkdownImport({
+      tenantId: 't1',
+      userId: 'u1',
+      taskId: 'task1',
+      req: { format: 'markdown', title: 'Doc', parentIds: [] },
+      file: { buffer: Buffer.from(markdown, 'utf-8'), originalname: 'x.md' },
+    });
+
+    expect(pageService.create).toHaveBeenCalledTimes(1);
+    const createArgs = (pageService.create as jest.Mock).mock.calls[0] ?? [];
+    const payload = createArgs[1] as { content: unknown };
+
+    expect(Array.isArray(payload.content)).toBe(true);
+    const content = payload.content as unknown as Array<Record<string, unknown>>;
+    expect(content[0]?.type).toBe('bulleted-list');
+
+    const a = content[0]?.children as unknown as Array<Record<string, unknown>>;
+    const aItem = a[0] as unknown as { children: unknown[] };
+    const nested = aItem.children.find((c) => {
+      if (!c || typeof c !== 'object') return false;
+      const rec = c as Record<string, unknown>;
+      return rec.type === 'bulleted-list' && Array.isArray(rec.children);
+    });
+    expect(nested).toBeTruthy();
+  });
+});

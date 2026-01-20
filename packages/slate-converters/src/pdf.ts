@@ -95,25 +95,26 @@ function splitKeyValueRuns(line: string): string[] {
 }
 
 function normalizeListLine(line: string): string | null {
-  const trimmed = line.trimStart();
+  const leading = (String(line ?? '').match(/^\s*/)?.[0] ?? '');
+  const trimmed = String(line ?? '').trimStart();
   const bulletMatch = trimmed.match(/^([•·●▪◦])\s+(.*)$/);
   if (bulletMatch) {
     const rest = (bulletMatch[2] ?? '').trim();
-    return `- ${rest}`.trimEnd();
+    return `${leading}- ${rest}`.trimEnd();
   }
 
   const orderedMatch = trimmed.match(/^(\d+)[.)]\s+(.*)$/);
   if (orderedMatch) {
     const n = orderedMatch[1];
     const rest = (orderedMatch[2] ?? '').trim();
-    return `${n}. ${rest}`.trimEnd();
+    return `${leading}${n}. ${rest}`.trimEnd();
   }
 
   const orderedCnMatch = trimmed.match(/^(\d+)[、）)]\s*(.*)$/);
   if (orderedCnMatch) {
     const n = orderedCnMatch[1];
     const rest = (orderedCnMatch[2] ?? '').trim();
-    return `${n}. ${rest}`.trimEnd();
+    return `${leading}${n}. ${rest}`.trimEnd();
   }
 
   const orderedCnNumMatch = trimmed.match(/^([一二三四五六七八九十]+)[、）)]\s*(.*)$/);
@@ -149,14 +150,14 @@ function normalizeListLine(line: string): string | null {
 
     const n = cnToInt(cn);
     if (n == null) return null;
-    return `${n}. ${rest}`.trimEnd();
+    return `${leading}${n}. ${rest}`.trimEnd();
   }
 
   const mdBullet = trimmed.match(/^[-*+]\s+(.*)$/);
-  if (mdBullet) return `- ${(mdBullet[1] ?? '').trim()}`.trimEnd();
+  if (mdBullet) return `${leading}- ${(mdBullet[1] ?? '').trim()}`.trimEnd();
 
   const mdOrdered = trimmed.match(/^(\d+)\.\s+(.*)$/);
-  if (mdOrdered) return `${mdOrdered[1]}. ${(mdOrdered[2] ?? '').trim()}`.trimEnd();
+  if (mdOrdered) return `${leading}${mdOrdered[1]}. ${(mdOrdered[2] ?? '').trim()}`.trimEnd();
 
   return null;
 }
@@ -364,6 +365,10 @@ export function pdfPagesToMarkdown(pages: string[]): string {
       const isIndented = /^\s{4,}\S/.test(line);
       if (isIndented) {
         flushParagraph();
+        if (listActive) {
+          out.push(line);
+          continue;
+        }
         endList();
         quoteActive = true;
         out.push(`> ${line.trimStart()}`);
@@ -419,4 +424,3 @@ export function pdfPagesToMarkdown(pages: string[]): string {
   while (out.length && !out[out.length - 1].trim()) out.pop();
   return out.join('\n').trim();
 }
-

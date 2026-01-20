@@ -56,5 +56,34 @@ describe('pdfPagesToMarkdown', () => {
     const md = pdfPagesToMarkdown(['    Indented line']);
     expect(md).toContain('> Indented line');
   });
-});
 
+  it('preserves indentation for nested list markers', () => {
+    const md = pdfPagesToMarkdown(['• A\n    • B\n        • C']);
+    expect(md).toContain('- A');
+    expect(md).toContain('    - B');
+    expect(md).toContain('        - C');
+
+    const value = markdownToSlateValue(md);
+    const root = value[0] as unknown as { type: string; children: unknown[] };
+    expect(root.type).toBe('bulleted-list');
+    const a = root.children[0] as unknown as { type: string; children: unknown[] };
+
+    const nested1 = a.children.find((c) => {
+      if (!c || typeof c !== 'object') return false;
+      const rec = c as Record<string, unknown>;
+      return rec.type === 'bulleted-list' && Array.isArray(rec.children);
+    });
+
+    expect(nested1).toBeTruthy();
+    const nested1Rec = nested1 as unknown as { children: unknown[] };
+    const b = nested1Rec.children[0] as unknown as { children: unknown[] };
+
+    const nested2 = b.children.find((c) => {
+      if (!c || typeof c !== 'object') return false;
+      const rec = c as Record<string, unknown>;
+      return rec.type === 'bulleted-list' && Array.isArray(rec.children);
+    });
+
+    expect(nested2).toBeTruthy();
+  });
+});

@@ -1,4 +1,4 @@
-import type { SlateText, SlateValue } from './types';
+import type { SlateElement, SlateNode, SlateText, SlateValue } from './types';
 
 type Marks = {
   bold?: boolean;
@@ -193,24 +193,230 @@ function parseBlockquoteLines(lines: string[]): SlateValue {
   ];
 }
 
-function parseList(lines: string[], ordered: boolean): SlateValue {
-  const listType = ordered ? 'numbered-list' : 'bulleted-list';
-  const items = lines
-    .map((l) => {
-      const cleaned = ordered ? l.replace(/^\s*\d+\.\s+/, '') : l.replace(/^\s*[-*+]\s+/, '');
-      return {
-        type: 'list-item',
-        children: [ensureParagraph(convertInlineText(cleaned.trimEnd()))],
-      };
-    })
-    .filter(Boolean);
+function countIndent(input: string): number {
+  const s = String(input ?? '');
+  let n = 0;
+  for (let i = 0; i < s.length; i += 1) {
+    const ch = s[i] ?? '';
+    if (ch === ' ') {
+      n += 1;
+      continue;
+    }
+    if (ch === '\t') {
+      n += 4;
+      continue;
+    }
+    break;
+  }
+  return n;
+}
 
-  return [
-    {
-      type: listType,
-      children: items.length ? items : [{ type: 'list-item', children: [ensureParagraph([{ text: '' }])] }],
-    },
-  ];
+function parseListMarker(line: string):
+  | {
+      indent: number;
+      listType: 'numbered-list' | 'bulleted-list';
+      text: string;
+    }
+  | null {
+  const s = String(line ?? '');
+  const indent = countIndent(s);
+  const trimmed = s.trimStart();
+
+  const bullet = trimmed.match(/^[-*+]\s+(.*)$/);
+  if (bullet) {
+    return { indent, listType: 'bulleted-list', text: String(bullet[1] ?? '') };
+  }
+
+  const ordered = trimmed.match(/^(\d+)[.)]?\s+(.*)$/);
+  if (ordered && /^\d+\./.test(trimmed)) {
+    return { indent, listType: 'numbered-list', text: String(ordered[2] ?? '') };
+  }
+  if (ordered && /^(\d+)[)]\s+/.test(trimmed)) {
+    return { indent, listType: 'numbered-list', text: String(ordered[2] ?? '') };
+  }
+
+  return null;
+}
+
+function isListContinuationLine(line: string): boolean {
+  const s = String(line ?? '');
+  if (!s.trim()) return false;
+  return /^\s{2,}\S/.test(s) || /^\t+\S/.test(s);
+}
+
+function ensureListItemText(item: { type: 'list-item'; children: SlateNode[] }, text: string, opts?: { append?: boolean }) {
+  const last = item.children[item.children.length - 1];
+  const normalized = String(text ?? '').trimEnd();
+
+  if (
+    opts?.append &&
+    last &&
+    typeof last === 'object' &&
+    'type' in (last as Record<string, unknown>) &&
+    (last as Record<string, unknown>).type === 'paragraph' &&
+    Array.isArray((last as Record<string, unknown>).children)
+  ) {
+    const paragraph = last as unknown as { type: 'paragraph'; children: SlateText[] };
+    paragraph.children.push({ text: '\n' });
+    paragraph.children.push(...convertInlineText(normalized.trimStart()));
+    return;
+  }
+
+  item.children.push(ensureParagraph(convertInlineText(normalized.trimStart())));
+}
+
+function parseListBlocks(lines: string[]): SlateValue {
+  const blocks: SlateValue = [];
+
+  type ListEntry = {
+    indent: number;
+    listType: 'numbered-list' | 'bulleted-list';
+    listNode: SlateElement & {
+      type: 'numbered-list' | 'bulleted-list';
+      children: Array<SlateElement & { type: 'list-item'; children: SlateNode[] }>;
+    };
+    lastItem: (SlateElement & { type: 'list-item'; children: SlateNode[] }) | null;
+  };
+
+  const stack: ListEntry[] = [];
+  let pendingBlank = false;
+
+  const ensureListAt = (indent: number, listType: 'numbered-list' | 'bulleted-list'): ListEntry => {
+    while (stack.length) {
+      const top = stack[stack.length - 1] as ListEntry;
+      if (indent < top.indent) {
+        stack.pop();
+        continue;
+      }
+      if (indent === top.indent && top.listType !== listType) {
+        stack.pop();
+        continue;
+      }
+      break;
+    }
+
+    if (!stack.length) {
+      const listNode: ListEntry['listNode'] = { type: listType, children: [] };
+      const entry: ListEntry = { indent, listType, listNode, lastItem: null };
+      blocks.push(listNode);
+      stack.push(entry);
+      return entry;
+    }
+
+    const top = stack[stack.length - 1] as ListEntry;
+    if (indent === top.indent && top.listType === listType) return top;
+
+    if (indent > top.indent) {
+      if (!top.lastItem) {
+        const placeholder: ListEntry['lastItem'] = {
+          type: 'list-item',
+          children: [ensureParagraph([{ text: '' }])],
+        };
+        top.listNode.children.push(placeholder);
+        top.lastItem = placeholder;
+      }
+
+      const parentItem = top.lastItem;
+      let nested: ListEntry['listNode'] | null = null;
+
+      for (let i = parentItem.children.length - 1; i >= 0; i -= 1) {
+        const child = parentItem.children[i];
+        if (
+          child &&
+          typeof child === 'object' &&
+          'type' in (child as Record<string, unknown>) &&
+          (child as Record<string, unknown>).type === listType &&
+          Array.isArray((child as Record<string, unknown>).children)
+        ) {
+          nested = child as ListEntry['listNode'];
+          break;
+        }
+      }
+
+      if (!nested) {
+        nested = { type: listType, children: [] };
+        parentItem.children.push(nested);
+      }
+
+      const entry: ListEntry = { indent, listType, listNode: nested, lastItem: null };
+      stack.push(entry);
+      return entry;
+    }
+
+    const fallback = stack[stack.length - 1] as ListEntry;
+    if (fallback.listType === listType) return fallback;
+    return ensureListAt(indent, listType);
+  };
+
+  let idx = 0;
+  while (idx < lines.length) {
+    const raw = String(lines[idx] ?? '');
+
+    if (!raw.trim()) {
+      pendingBlank = true;
+      idx += 1;
+      continue;
+    }
+
+    const marker = parseListMarker(raw);
+    if (marker) {
+      const entry = ensureListAt(marker.indent, marker.listType);
+      const item: ListEntry['lastItem'] = {
+        type: 'list-item',
+        children: [ensureParagraph(convertInlineText(String(marker.text ?? '').trimEnd()))],
+      };
+      entry.listNode.children.push(item);
+      entry.lastItem = item;
+      pendingBlank = false;
+      idx += 1;
+      continue;
+    }
+
+    const entry = stack[stack.length - 1];
+    if (!entry) {
+      blocks.push(...parseParagraphLines([raw]));
+      pendingBlank = false;
+      idx += 1;
+      continue;
+    }
+
+    if (!entry.lastItem) {
+      const placeholder: ListEntry['lastItem'] = {
+        type: 'list-item',
+        children: [ensureParagraph([{ text: '' }])],
+      };
+      entry.listNode.children.push(placeholder);
+      entry.lastItem = placeholder;
+    }
+
+    const run: string[] = [];
+    while (idx < lines.length) {
+      const line = String(lines[idx] ?? '');
+      if (!line.trim()) break;
+      if (parseListMarker(line)) break;
+      run.push(line);
+      idx += 1;
+    }
+
+    const content = run
+      .map((l) => String(l ?? '').trimEnd().trimStart())
+      .join('\n')
+      .trimEnd();
+
+    ensureListItemText(entry.lastItem, content, { append: !pendingBlank });
+    pendingBlank = false;
+  }
+
+  if (!blocks.length) {
+    return [
+      {
+        type: 'bulleted-list',
+        children: [{ type: 'list-item', children: [ensureParagraph([{ text: '' }])] }],
+      },
+    ];
+  }
+
+  return blocks;
 }
 
 export function markdownToSlateValue(markdown: string): SlateValue {
@@ -259,17 +465,32 @@ export function markdownToSlateValue(markdown: string): SlateValue {
       continue;
     }
 
-    const isBullet = /^\s*[-*+]\s+/.test(line);
-    const isOrdered = /^\s*\d+\.\s+/.test(line);
-    if (isBullet || isOrdered) {
+    if (parseListMarker(line)) {
       const listLines: string[] = [];
-      const ordered = isOrdered;
-      const lineRe = ordered ? /^\s*\d+\.\s+/ : /^\s*[-*+]\s+/;
-      while (i < lines.length && lineRe.test(lines[i] ?? '')) {
-        listLines.push(lines[i] ?? '');
-        i += 1;
+
+      while (i < lines.length) {
+        const current = lines[i] ?? '';
+
+        if (!String(current).trim()) {
+          const next = i + 1 < lines.length ? (lines[i + 1] ?? '') : '';
+          if (parseListMarker(next) || isListContinuationLine(next)) {
+            listLines.push(current);
+            i += 1;
+            continue;
+          }
+          break;
+        }
+
+        if (parseListMarker(current) || isListContinuationLine(current)) {
+          listLines.push(current);
+          i += 1;
+          continue;
+        }
+
+        break;
       }
-      blocks.push(...parseList(listLines, ordered));
+
+      blocks.push(...parseListBlocks(listLines));
       continue;
     }
 
@@ -280,8 +501,7 @@ export function markdownToSlateValue(markdown: string): SlateValue {
       if (/^\s*```/.test(current)) break;
       if (/^\s*(#{1,6})\s+/.test(current)) break;
       if (/^\s*>/.test(current)) break;
-      if (/^\s*[-*+]\s+/.test(current)) break;
-      if (/^\s*\d+\.\s+/.test(current)) break;
+      if (parseListMarker(current)) break;
       paraLines.push(current);
       i += 1;
     }
