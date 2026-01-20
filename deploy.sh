@@ -1,6 +1,30 @@
 #!/bin/bash
 set -e
 
+if command -v git &> /dev/null && [ -d ".git" ]; then
+  echo "🔄 同步代码..."
+  if ! git fetch origin main --prune; then
+    echo "⚠️  Git fetch 失败，继续使用本地代码"
+  fi
+
+  LOCAL_SHA=$(git rev-parse HEAD)
+  REMOTE_SHA=$(git rev-parse origin/main 2>/dev/null || echo "")
+
+  if [ -n "$REMOTE_SHA" ] && [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
+    if git merge-base --is-ancestor "$LOCAL_SHA" "$REMOTE_SHA"; then
+      git merge --ff-only "$REMOTE_SHA"
+    else
+      git reset --hard "$REMOTE_SHA"
+    fi
+  fi
+
+  export GIT_COMMIT
+  GIT_COMMIT=$(git rev-parse --short HEAD)
+  echo "✅ 当前版本: $GIT_COMMIT"
+else
+  export GIT_COMMIT=unknown
+fi
+
 if command -v docker compose &> /dev/null; then
   COMPOSE="docker compose"
 elif command -v docker-compose &> /dev/null; then
@@ -27,6 +51,15 @@ $COMPOSE -f docker-compose.prod.yml build
 echo ""
 echo "▶️  启动容器..."
 $COMPOSE -f docker-compose.prod.yml up -d
+
+echo ""
+echo "🏷️  当前运行版本..."
+if ! $COMPOSE -f docker-compose.prod.yml exec -T api bash -lc 'echo "api:${CONTEXTA_GIT_COMMIT:-unknown}"'; then
+  echo "⚠️  无法读取 API 版本"
+fi
+if ! $COMPOSE -f docker-compose.prod.yml exec -T web bash -lc 'echo "web:${CONTEXTA_GIT_COMMIT:-unknown}"'; then
+  echo "⚠️  无法读取 Web 版本"
+fi
 
 echo ""
 echo "🔄 重新加载 Nginx 配置..."

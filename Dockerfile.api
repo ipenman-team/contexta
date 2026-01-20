@@ -2,8 +2,13 @@ FROM node:20-slim
 
 WORKDIR /app
 
+ARG GIT_COMMIT=unknown
 ARG COREPACK_NPM_REGISTRY=https://registry.npmjs.org
 ARG NPM_REGISTRY=https://registry.npmjs.org
+
+ENV CONTEXTA_GIT_COMMIT=${GIT_COMMIT}
+
+LABEL org.opencontainers.image.revision=${GIT_COMMIT}
 
 ENV COREPACK_NPM_REGISTRY=${COREPACK_NPM_REGISTRY}
 ENV npm_config_registry=${NPM_REGISTRY}
