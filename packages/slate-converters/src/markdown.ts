@@ -22,14 +22,60 @@ function applyMark(text: string, marks: Marks): SlateText[] {
   return [{ text, ...marks }];
 }
 
+function unescapeBackslashEscapes(input: string): string {
+  const text = String(input ?? '');
+  if (!text) return '';
+
+  const out: string[] = [];
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i] ?? '';
+    const isSlash = ch === '\\' || ch === '＼';
+
+    if (!isSlash) {
+      out.push(ch);
+      continue;
+    }
+
+    if (i + 1 >= text.length) {
+      continue;
+    }
+
+    const next = text[i + 1] ?? '';
+    const isNextSlash = next === '\\' || next === '＼';
+
+    if (isNextSlash) {
+      const third = i + 2 < text.length ? (text[i + 2] ?? '') : '';
+      if (third && /[^a-zA-Z0-9\s]/.test(third)) {
+        out.push(third);
+        i += 2;
+        continue;
+      }
+
+      out.push('\\');
+      i += 1;
+      continue;
+    }
+
+    if (/[^a-zA-Z0-9\s]/.test(next)) {
+      out.push(next);
+      i += 1;
+      continue;
+    }
+  }
+
+  return out.join('');
+}
+
 function convertInlineText(input: string, marks: Marks = {}): SlateText[] {
   const text = String(input ?? '');
   if (!text) return [{ text: '' }];
 
   const out: SlateText[] = [];
 
-  const pushText = (chunk: string, nextMarks: Marks) => {
-    if (chunk) out.push(...applyMark(chunk, nextMarks));
+  const pushText = (chunk: string, nextMarks: Marks, opts?: { unescape?: boolean }) => {
+    if (!chunk) return;
+    const normalized = opts?.unescape === false ? chunk : unescapeBackslashEscapes(chunk);
+    if (normalized) out.push(...applyMark(normalized, nextMarks));
   };
 
   const findNextToken = (from: number): number => {
@@ -45,6 +91,15 @@ function convertInlineText(input: string, marks: Marks = {}): SlateText[] {
 
   let i = 0;
   while (i < text.length) {
+    if (text[i] === '\\' && i + 1 < text.length) {
+      const nextChar = text[i + 1] ?? '';
+      if (nextChar === '\\' || (/[^a-zA-Z0-9\s]/.test(nextChar) && nextChar !== '')) {
+        pushText(nextChar, marks, { unescape: false });
+        i += 2;
+        continue;
+      }
+    }
+
     const uOpen = text.slice(i).match(/^<(u|ins)>/i);
     if (uOpen) {
       const tag = uOpen[1];
@@ -77,7 +132,7 @@ function convertInlineText(input: string, marks: Marks = {}): SlateText[] {
       const start = i + spec.open.length;
       const end = text.indexOf(spec.close, start);
       if (end === -1) {
-        pushText(spec.open, marks);
+        pushText(spec.open, marks, { unescape: false });
         i = start;
         matched = true;
         break;
@@ -85,7 +140,7 @@ function convertInlineText(input: string, marks: Marks = {}): SlateText[] {
 
       const inner = text.slice(start, end);
       if (spec.open === '`') {
-        pushText(inner, spec.next);
+        pushText(inner, spec.next, { unescape: false });
       } else {
         out.push(...convertInlineText(inner, spec.next));
       }

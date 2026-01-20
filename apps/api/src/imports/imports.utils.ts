@@ -40,3 +40,26 @@ export function parseParentIds(input: unknown): string[] {
 
   throw new BadRequestException('invalid parentIds');
 }
+
+export function normalizeDocxMarkdown(input: string): string {
+  const normalized = String(input ?? '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
+
+  const lines = normalized.split('\n').map((line) => {
+    const match = line.match(/^\s*(#{1,6})\s+(.*)$/);
+    if (!match) return line;
+    const depth = match[1].length;
+    const text = (match[2] ?? '').trimEnd();
+    if (depth <= 1) return `# ${text}`;
+    return `## ${text}`;
+  });
+
+  let out = lines.join('\n');
+  out = out.replace(/!\[[^\]]*]\([^)]*\)/g, '');
+  out = out.replace(/<(?!\/?(?:u|ins)\b)[^>]+>/gi, '');
+  out = out.replace(/\n{3,}/g, '\n\n');
+  out = out.trim();
+
+  return out ? `${out}\n` : '';
+}

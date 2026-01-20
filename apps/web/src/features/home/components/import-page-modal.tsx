@@ -5,7 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 
-type ImportType = "markdown" | "pdf";
+type ImportType = "markdown" | "pdf" | "docx";
 
 type ImportOption = {
   id: string;
@@ -53,10 +53,12 @@ export function ImportPageModal(props: {
   onOpenChange: (open: boolean) => void;
   onPickMarkdownFile: (file: File) => void;
   onPickPdfFile: (file: File) => void;
+  onPickDocxFile: (file: File) => void;
 }) {
   const [selected, setSelected] = useState<ImportType | null>("markdown");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
+  const docxInputRef = useRef<HTMLInputElement | null>(null);
 
   const options: ImportOption[] = useMemo(
     () =>
@@ -78,7 +80,13 @@ export function ImportPageModal(props: {
         },
         { id: "markdown-zip", label: "Markdown Zip", extensions: ".zip", enabled: false, type: null },
         { id: "html-zip", label: "HTML Zip", extensions: ".zip", enabled: false, type: null },
-        { id: "word", label: "Word", extensions: ".docx .doc", enabled: false, type: null },
+        {
+          id: "word",
+          label: "Word",
+          extensions: ".docx",
+          enabled: true,
+          type: "docx",
+        },
         { id: "excel", label: "Excel", extensions: ".xlsx .csv", enabled: false, type: null },
         { id: "xmind", label: "Xmind", extensions: ".xmind .opml", enabled: false, type: null },
       ] satisfies ImportOption[],
@@ -109,6 +117,8 @@ export function ImportPageModal(props: {
                       fileInputRef.current?.click();
                     } else if (opt.type === "pdf") {
                       pdfInputRef.current?.click();
+                    } else if (opt.type === "docx") {
+                      docxInputRef.current?.click();
                     }
                   }
                 : undefined
@@ -143,6 +153,21 @@ export function ImportPageModal(props: {
           if (!file) return;
 
           props.onPickPdfFile(file);
+          props.onOpenChange(false);
+        }}
+      />
+
+      <input
+        ref={docxInputRef}
+        type="file"
+        accept="application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
+        className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+
+          props.onPickDocxFile(file);
           props.onOpenChange(false);
         }}
       />

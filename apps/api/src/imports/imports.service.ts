@@ -4,10 +4,11 @@ import { PageService } from '../page/page.service';
 import { TaskRuntimeService } from '../task/task.runtime.service';
 import { TaskService } from '../task/task.service';
 import { markdownToSlateValue, pdfPagesToMarkdown } from '@contexta/slate-converters';
-import { fileNameToTitle, parseParentIds } from './imports.utils';
+import { fileNameToTitle, normalizeDocxMarkdown, parseParentIds } from './imports.utils';
 import type { ImportRequest } from './imports.types';
 import * as fs from 'node:fs/promises';
 import { PDFParse } from 'pdf-parse';
+import * as mammoth from 'mammoth';
 
 type UploadedFile = {
   buffer?: Buffer;
@@ -25,7 +26,9 @@ export class ImportsService {
 
   async createImportTask(tenantId: string, userId: string, req: ImportRequest, fileName?: string) {
     const format = (req.format ?? 'markdown').toLowerCase();
-    if (format !== 'markdown' && format !== 'pdf') throw new BadRequestException('format not supported');
+    if (format !== 'markdown' && format !== 'pdf' && format !== 'docx') {
+      throw new BadRequestException('format not supported');
+    }
 
     return this.taskService.create(tenantId, userId, {
       type: TaskType.IMPORT,
@@ -54,6 +57,16 @@ export class ImportsService {
     file: UploadedFile;
   }) {
     void this.runPdfImport(args);
+  }
+
+  startDocxImport(args: {
+    tenantId: string;
+    userId: string;
+    taskId: string;
+    req: ImportRequest;
+    file: UploadedFile;
+  }) {
+    void this.runDocxImport(args);
   }
 
   private async runMarkdownImport(args: {
@@ -212,6 +225,89 @@ export class ImportsService {
     }
   }
 
+  private async runDocxImport(args: {
+    tenantId: string;
+    userId: string;
+    taskId: string;
+    req: ImportRequest;
+    file: UploadedFile;
+  }) {
+    const controller = new AbortController();
+    this.taskRuntime.registerAbortController(args.taskId, controller);
+
+    try {
+      await this.taskService.markRunning(args.tenantId, args.taskId, 'Reading file');
+
+      if (controller.signal.aborted) {
+        await this.taskService.cancel(args.tenantId, args.taskId, args.userId, 'Cancelled');
+        return;
+      }
+
+      const docxBuffer = await this.readFileBuffer(args.file);
+      const name = String(args.file.originalname ?? '').trim();
+      if (!ImportsService.looksLikeDocx(docxBuffer) || !/\.docx$/i.test(name)) {
+        throw new BadRequestException('invalid docx');
+      }
+
+      await this.taskService.updateProgress(args.tenantId, args.taskId, 30, 'Parsing DOCX');
+
+      const result = await (mammoth as unknown as { convertToMarkdown: (input: { buffer: Buffer }) => Promise<{ value: string }> }).convertToMarkdown({
+        buffer: docxBuffer,
+      });
+      const markdown = normalizeDocxMarkdown(result.value);
+      await this.taskService.updateProgress(args.tenantId, args.taskId, 55, 'Building markdown');
+
+      if (controller.signal.aborted) {
+        await this.taskService.cancel(args.tenantId, args.taskId, args.userId, 'Cancelled');
+        return;
+      }
+
+      await this.taskService.updateProgress(args.tenantId, args.taskId, 70, 'Parsing markdown');
+
+      const content = markdownToSlateValue(markdown);
+      const parentIds = parseParentIds(args.req.parentIds);
+      const title = (args.req.title?.trim() || fileNameToTitle(args.file.originalname)).trim();
+
+      if (controller.signal.aborted) {
+        await this.taskService.cancel(args.tenantId, args.taskId, args.userId, 'Cancelled');
+        return;
+      }
+
+      await this.taskService.updateProgress(args.tenantId, args.taskId, 85, 'Creating page');
+
+      const created = await this.pageService.create(
+        args.tenantId,
+        {
+          title,
+          content,
+          parentIds,
+        },
+        args.userId,
+      );
+
+      await this.taskService.updateProgress(args.tenantId, args.taskId, 95, 'Publishing page');
+      const published = await this.pageService.publish(args.tenantId, created.id, args.userId);
+
+      await this.taskService.succeed(
+        args.tenantId,
+        args.taskId,
+        { pageId: created.id, versionId: published.versionId },
+        'Completed',
+      );
+    } catch (error) {
+      try {
+        const task = await this.taskService.get(args.tenantId, args.taskId);
+        if (task.status === TaskStatus.CANCELLED) return;
+      } catch {
+        // ignore
+      }
+
+      await this.taskService.fail(args.tenantId, args.taskId, error, 'Failed');
+    } finally {
+      this.taskRuntime.unregisterAbortController(args.taskId);
+    }
+  }
+
   private async readFileText(file: UploadedFile): Promise<string> {
     if (file.buffer) return file.buffer.toString('utf-8');
     if (file.path) {
@@ -248,5 +344,11 @@ export class ImportsService {
     if (!buffer?.length) return false;
     if (buffer.length < 5) return false;
     return buffer.subarray(0, 5).toString('ascii') === '%PDF-';
+  }
+
+  private static looksLikeDocx(buffer: Buffer): boolean {
+    if (!buffer?.length) return false;
+    if (buffer.length < 4) return false;
+    return buffer.subarray(0, 2).toString('ascii') === 'PK';
   }
 }

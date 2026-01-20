@@ -15,5 +15,22 @@ describe('markdownToSlateValue inline parsing', () => {
     const plain = slateToPlainText(value);
     expect(plain).toContain('`https://cx.cnki.net');
   });
-});
 
+  it('unescapes backslash-escaped punctuation', () => {
+    const text = '## 2\\. 标题\n\\[1\\] 2020\\(07\\):3\\-14\\.\n';
+    const value = markdownToSlateValue(text);
+    const plain = slateToPlainText(value);
+    expect(plain).toContain('2. 标题');
+    expect(plain).toContain('[1] 2020(07):3-14.');
+    expect(plain).not.toContain('\\');
+  });
+
+  it('unescapes fullwidth backslash escapes', () => {
+    const text = '## 6＼. 团队管理\n（图＼(二＼)）\n';
+    const value = markdownToSlateValue(text);
+    const plain = slateToPlainText(value);
+    expect(plain).toContain('6. 团队管理');
+    expect(plain).toContain('（图(二)）');
+    expect(plain).not.toContain('＼');
+  });
+});

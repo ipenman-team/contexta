@@ -59,6 +59,14 @@ export class ImportsController {
         req: body,
         file,
       });
+    } else if (format === 'docx') {
+      this.importsService.startDocxImport({
+        tenantId,
+        userId: actor,
+        taskId: task.id,
+        req: body,
+        file,
+      });
     } else {
       throw new BadRequestException('format not supported');
     }
