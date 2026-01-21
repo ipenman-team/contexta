@@ -2,16 +2,8 @@ import { memo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useNodeMenuState } from '@/stores';
+import { EllipsisIcon } from 'lucide-react';
 
-/**
- * 树节点操作按钮组
- * 包含：新增子页面、打开菜单
- *
- * 合并了以下原组件：
- * - atoms/page-tree/add-button.tsx (+ 按钮)
- * - atoms/page-tree/menu-trigger.tsx (... 按钮)
- * - molecules/page-tree/node-actions.tsx (按钮组编排)
- */
 export const TreeNodeActions = memo(function TreeNodeActions({
   nodeId,
   onToggleMenu,
@@ -45,7 +37,7 @@ export const TreeNodeActions = memo(function TreeNodeActions({
         aria-expanded={isMenuOpen}
         onPointerDown={handleToggleMenu}
       >
-        …
+        <EllipsisIcon className="h-3 w-3" />
       </Button>
     </div>
   );

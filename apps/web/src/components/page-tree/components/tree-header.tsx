@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useCreatingPage } from '@/stores';
+import { PlusCircleIcon } from 'lucide-react';
 
 /**
  * 页面树头部组件
@@ -63,7 +64,7 @@ export const PageTreeHeader = memo(function PageTreeHeader({
         aria-expanded={openAddMenu}
         onPointerDown={handleToggleMenu}
       >
-        +
+        <PlusCircleIcon className='h-4 w-4' color='oklch(0.62 0.19 260)'/>
       </Button>
 
       {openAddMenu && (

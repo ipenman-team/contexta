@@ -23,11 +23,11 @@ export const PageSidebar = memo(function PageSidebar({
     <aside className="w-72 border-r bg-muted/30">
       <div className="flex h-dvh flex-col overflow-hidden p-3">
         <div className='flex justify-between p-3'>
-          <div></div>
-          <div>
-            <UserProfilePanel></UserProfilePanel>
-          </div>
+        <div></div>
+        <div>
+          <UserProfilePanel></UserProfilePanel>
         </div>
+      </div>
         <div className="flex flex-col gap-4">
           <SidebarItem
             label="仪表盘"

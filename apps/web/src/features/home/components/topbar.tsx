@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { EllipsisIcon, LogsIcon, MenuIcon } from "lucide-react";
 
 export function PageTopbar(props: {
   visible: boolean;
@@ -67,7 +68,7 @@ export function PageTopbar(props: {
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               size="sm"
               disabled={!props.activePageExists}
               onClick={props.onEnterEdit}
@@ -88,7 +89,7 @@ export function PageTopbar(props: {
                   props.setOpenMore((prev) => !prev);
                 }}
               >
-                …
+                <LogsIcon className="h-5 w-5" />
               </Button>
 
               {props.openMore ? (
