@@ -9,6 +9,8 @@ import { TenantMiddleware } from './common/tenant/tenant.middleware';
 import { TaskModule } from './task/task.module';
 import { ImportsModule } from './imports/imports.module';
 import { AuthModule } from './auth/auth.module';
+import { FilesModule } from './files/files.module';
+import { UserModule } from './user/user.module';
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { AuthModule } from './auth/auth.module';
     TaskModule,
     ImportsModule,
     AuthModule,
+    UserModule,
+    FilesModule
   ],
   controllers: [AppController],
   providers: [AppService, TenantMiddleware],

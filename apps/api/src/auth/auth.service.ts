@@ -605,51 +605,6 @@ export class AuthService {
     return { ok: true };
   }
 
-  async me(input: { userId: string; tenantId: string }) {
-    const userId = input.userId?.trim();
-    const tenantId = input.tenantId?.trim();
-    if (!userId) throw new BadRequestException('userId is required');
-    if (!tenantId) throw new BadRequestException('tenantId is required');
-
-    const profile = await this.prisma.userProfile.findFirst({
-      where: { userId, isDeleted: false },
-      select: {
-        nickname: true,
-        avatarUrl: true,
-        bio: true,
-        phone: true,
-      },
-    });
-
-    const tenant = await this.prisma.tenant.findFirst({
-      where: { id: tenantId, isDeleted: false },
-      select: { id: true, type: true, key: true, name: true },
-    });
-    if (!tenant)
-      throw new HttpException('tenant 不存在', HttpStatus.UNAUTHORIZED);
-
-    const memberships = await this.prisma.tenantMembership.findMany({
-      where: {
-        userId,
-        isDeleted: false,
-        tenant: { isDeleted: false },
-      },
-      orderBy: { createdAt: 'asc' },
-      select: {
-        role: true,
-        tenant: { select: { id: true, type: true, key: true, name: true } },
-      },
-    });
-
-    return {
-      ok: true,
-      user: { id: userId },
-      profile,
-      tenant,
-      memberships,
-    };
-  }
-
   async switchTenant(input: {
     userId: string;
     sessionId?: string;

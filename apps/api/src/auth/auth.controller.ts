@@ -53,11 +53,6 @@ export class AuthController {
     return this.authService.logout({ sessionId, userId });
   }
 
-  @Get('me')
-  me(@UserId() userId: string | undefined, @TenantId() tenantId: string) {
-    return this.authService.me({ userId: userId ?? '', tenantId });
-  }
-
   @Post('switch-tenant')
   switchTenant(
     @UserId() userId: string | undefined,

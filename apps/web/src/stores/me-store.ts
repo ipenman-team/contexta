@@ -1,3 +1,4 @@
+import { apiClient } from '@/lib/api';
 import { create } from 'zustand';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -7,6 +8,8 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 export type MeProfile = {
   nickname: string | null;
   avatarUrl: string | null;
+  bio: string | null;
+  phone: string | null;
 };
 
 export type MeUser = {
@@ -38,6 +41,11 @@ interface MeState extends MeSnapshot {
   ensureLoaded: (options?: { force?: boolean }) => Promise<void>;
   invalidate: () => void;
   setProfile: (profile: MeProfile | null) => void;
+  updateProfile: (input: {
+    nickname?: string | null;
+    avatarUrl?: string | null;
+    bio?: string | null;
+  }) => Promise<{ ok: true; profile: MeProfile | null } | { ok: false; message: string }>;
 }
 
 const initialSnapshot: MeSnapshot = {
@@ -54,13 +62,19 @@ function normalizeProfile(input: unknown): MeProfile | null {
 
   const nicknameRaw = input.nickname;
   const avatarUrlRaw = input.avatarUrl;
+  const bioRaw = input.bio;
+  const phoneRaw = input.phone;
 
   const nickname = typeof nicknameRaw === 'string' ? nicknameRaw.trim() : '';
   const avatarUrl = typeof avatarUrlRaw === 'string' ? avatarUrlRaw.trim() : '';
+  const bio = typeof bioRaw === 'string' ? bioRaw.trim() : '';
+  const phone = typeof phoneRaw === 'string' ? phoneRaw.trim() : '';
 
   return {
     nickname: nickname.length > 0 ? nickname : null,
     avatarUrl: avatarUrl.length > 0 ? avatarUrl : null,
+    bio: bio.length > 0 ? bio : null,
+    phone: phone.length > 0 ? phone : null,
   };
 }
 
@@ -114,6 +128,30 @@ export const useMeStore = create<MeState>((set, get) => ({
 
   setProfile: (profile) => set({ profile }),
 
+  updateProfile: async (input) => {
+    const payload: Record<string, unknown> = {};
+    if ('nickname' in input) payload.nickname = input.nickname;
+    if ('avatarUrl' in input) payload.avatarUrl = input.avatarUrl;
+    if ('bio' in input) payload.bio = input.bio;
+
+    const res = await apiClient.put('/users/profile', payload);
+
+    if (res.status === 401) {
+      const mod = await import('@/lib/api/client');
+      await mod.handleUnauthorized();
+      return { ok: false, message: 'unauthorized' };
+    }
+
+    const data = res.data;
+    if (!data.ok) {
+      return { ok: false, message: res.data.message || '请求失败' };
+    }
+
+    const nextProfile = isRecord(data) ? normalizeProfile(data.profile) : null;
+    set({ profile: nextProfile });
+    return { ok: true, profile: nextProfile };
+  },
+
   ensureLoaded: async (options) => {
     const force = Boolean(options?.force);
     const state = get();
@@ -123,15 +161,15 @@ export const useMeStore = create<MeState>((set, get) => ({
     inflight = (async () => {
       set({ loading: true });
       try {
-        const res = await fetch('/api/auth/me', { method: 'GET' });
+        const res = await apiClient.get('/users/me');
         if (res.status === 401) {
           const mod = await import('@/lib/api/client');
           await mod.handleUnauthorized();
           return;
         }
-        if (!res.ok) return;
+        if (!res.data.ok) return;
 
-        const data = (await res.json().catch(() => null)) as unknown;
+        const data = res.data;
         if (!isRecord(data)) return;
 
         const user = normalizeUser(data.user);

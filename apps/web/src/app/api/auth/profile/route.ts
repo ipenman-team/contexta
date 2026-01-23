@@ -22,16 +22,20 @@ function parseCookies(header: string | null): Record<string, string> {
   return out;
 }
 
-export async function GET(req: Request) {
+export async function PUT(req: Request) {
   const cookies = parseCookies(req.headers.get('cookie'));
   const token = cookies[ACCESS_TOKEN_COOKIE] ? String(cookies[ACCESS_TOKEN_COOKIE]) : '';
   if (!token) return new NextResponse('unauthorized', { status: 401 });
 
-  const upstream = await fetch(`${getApiBaseUrl()}/auth/me`, {
-    method: 'GET',
+  const body = await req.json().catch(() => null);
+
+  const upstream = await fetch(`${getApiBaseUrl()}/auth/profile`, {
+    method: 'PUT',
     headers: {
       authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
     },
+    body: body ? JSON.stringify(body) : '{}',
   });
 
   const payload = await upstream.json().catch(() => null);
@@ -43,6 +47,6 @@ export async function GET(req: Request) {
     return new NextResponse(message, { status: upstream.status });
   }
 
-  return NextResponse.json(payload ?? { ok: true, user: null, profile: null, tenant: null });
+  return NextResponse.json(payload ?? { ok: true, profile: null });
 }
 
