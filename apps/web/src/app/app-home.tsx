@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 import { HomeLayout } from '@/components/layout';
-import { PageSidebar } from '@/components/sidebar';
+import { HomeSidebar } from '@/components/sidebar';
 import { PageEditor } from '@/components/editor';
 import { PageTopbar } from '@/features/home/components/topbar';
 import { MainContent } from '@/features/home/components/main-content';
@@ -381,7 +381,7 @@ export function HomeScreen(props: {
 
   return (
     <HomeLayout
-      sidebar={<PageSidebar onOpenImport={() => setOpenImportModal(true)} />}
+      sidebar={<HomeSidebar/>}
     >
       <PageTopbar
         visible={selected.kind === 'page'}

@@ -38,6 +38,17 @@ enum TenantRole {
   MEMBER
 }
 
+enum SpaceType {
+  PERSONAL
+  ORG
+}
+
+enum SpaceMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
 model RagChunk {
   id       String @id
   tenantId String @map("tenant_id")
@@ -180,6 +191,8 @@ model User {
   identities  UserIdentity[]
   memberships TenantMembership[]
   sessions    AuthSession[]
+  spaceMembers SpaceMember[]
+  spaceFavorites SpaceFavorite[]
 
   @@index([id])
   @@map("users")
@@ -251,6 +264,7 @@ model Tenant {
 
   memberships TenantMembership[]
   sessions    AuthSession[]
+  spaces      Space[]
 
   @@index([type])
   @@map("tenants")
@@ -277,6 +291,87 @@ model TenantMembership {
   @@index([userId])
   @@index([tenantId])
   @@map("tenant_memberships")
+}
+
+model Space {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+
+  name        String
+  description String? @db.Text
+  icon        String? 
+  color       String?
+  identifier  String?  @map("identifier")
+  type        SpaceType @default(ORG)
+  isArchived  Boolean  @default(false) @map("is_archived")
+
+  // extensible metadata for future fields to avoid schema churn
+  metadata    Json?    @db.JsonB
+
+  createdBy String @map("created_by")
+  updatedBy String @map("updated_by")
+
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  members SpaceMember[]
+  favorites SpaceFavorite[]
+
+  @@index([tenantId])
+  @@index([tenantId, identifier])
+  @@index([tenantId, name])
+  @@map("spaces")
+}
+
+model SpaceMember {
+  id       String @id @default(cuid())
+  spaceId  String @map("space_id")
+  userId   String @map("user_id")
+
+  role     SpaceMemberRole @default(MEMBER)
+
+  // optional per-member permissions
+  permissions Json? @db.JsonB
+
+  createdBy String @map("created_by")
+  updatedBy String @map("updated_by")
+
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([spaceId, userId])
+  @@index([userId])
+  @@index([spaceId])
+  @@map("space_members")
+}
+
+model SpaceFavorite {
+  id      String @id @default(cuid())
+  spaceId String @map("space_id")
+  userId  String @map("user_id")
+
+  createdBy String @map("created_by")
+  updatedBy String @map("updated_by")
+
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+
+  @@unique([spaceId, userId])
+  @@index([userId])
+  @@index([spaceId])
+  @@map("space_favorites")
 }
 
 model AuthSession {

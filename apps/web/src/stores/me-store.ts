@@ -1,4 +1,5 @@
 import { apiClient } from '@/lib/api';
+import { getApiBaseUrl } from '@/lib/api/client';
 import { create } from 'zustand';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -19,7 +20,7 @@ export type MeUser = {
 export type MeTenant = {
   id: string;
   type: string;
-  key: string;
+  key: string | null;
   name: string;
 };
 
@@ -91,17 +92,13 @@ function normalizeTenant(input: unknown): MeTenant | null {
   const type = input.type;
   const key = input.key;
   const name = input.name;
-  if (
-    typeof id !== 'string' ||
-    typeof type !== 'string' ||
-    typeof key !== 'string' ||
-    typeof name !== 'string'
-  ) {
+  if (typeof id !== 'string' || typeof type !== 'string' || typeof name !== 'string') {
     return null;
   }
   const tid = id.trim();
   if (!tid) return null;
-  return { id: tid, type, key, name };
+  const k = typeof key === 'string' ? (key.trim().length > 0 ? key : null) : null;
+  return { id: tid, type, key: k, name };
 }
 
 function normalizeMemberships(input: unknown): MeMembership[] {
@@ -161,7 +158,9 @@ export const useMeStore = create<MeState>((set, get) => ({
     inflight = (async () => {
       set({ loading: true });
       try {
+        console.log('[me-store] fetching /users/me, api base:', getApiBaseUrl?.() ?? 'unknown');
         const res = await apiClient.get('/users/me');
+        console.log('[me-store] /users/me res:', res.status, res.data);
         if (res.status === 401) {
           const mod = await import('@/lib/api/client');
           await mod.handleUnauthorized();

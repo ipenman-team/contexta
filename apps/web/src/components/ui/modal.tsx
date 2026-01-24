@@ -4,6 +4,7 @@ import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { XIcon } from "lucide-react";
 
 export function Modal(props: {
   open: boolean;
@@ -81,7 +82,7 @@ export function Modal(props: {
             aria-label="关闭"
             onClick={() => onOpenChange(false)}
           >
-            ×
+            <XIcon className="h-4 w-4"/>
           </Button>
         </div>
 

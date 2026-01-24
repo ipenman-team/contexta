@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PageModule } from './page/page.module';
+import { SpaceModule } from './space/space.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { TenantMiddleware } from './common/tenant/tenant.middleware';
 import { TaskModule } from './task/task.module';
@@ -27,6 +28,7 @@ import { UserModule } from './user/user.module';
     }),
     PrismaModule,
     PageModule,
+    SpaceModule,
     TaskModule,
     ImportsModule,
     AuthModule,
