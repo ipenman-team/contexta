@@ -38,9 +38,9 @@ export async function handleUnauthorized(): Promise<void> {
   if (unauthorizedHandling) return;
   unauthorizedHandling = true;
 
-  try {
-    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null);
-  } finally {
+    try {
+      await apiClient.post('/auth/logout').catch(() => null);
+    } finally {
     useTaskStore.getState().cleanupAllRuntimes();
 
     useTaskStore.setState({ tasks: [], taskRuntime: new Map() });

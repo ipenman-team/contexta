@@ -56,9 +56,9 @@ export const UserProfilePanel = memo(function UserProfilePanel(
     const handleLogout = useCallback(async () => {
         if (loggingOut) return;
         setLoggingOut(true);
-        try {
-            await fetch("/api/auth/logout", { method: "POST" });
-        } finally {
+            try {
+                await apiClient.post('/auth/logout').catch(() => null);
+            } finally {
             setLoggingOut(false);
             router.replace("/login");
             router.refresh();

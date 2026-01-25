@@ -7,6 +7,7 @@ import { isValidEmail, toDigits } from '@contexta/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { apiClient } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -62,25 +63,15 @@ export default function LoginPage() {
     setSending(true);
     try {
       const trimmedEmail = email.trim();
-      const res = await fetch('/api/auth/verification-codes/send', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ channel: 'email', recipient: trimmedEmail, type: 'login' }),
-      });
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        setApiError(text || '发送失败，请稍后重试');
-        return;
-      }
-
-      const data = (await res.json().catch(() => null)) as null | {
-        cooldownSeconds?: unknown;
-      };
+      const { data } = await apiClient.post('/auth/verification-codes/send', {
+        channel: 'email',
+        recipient: trimmedEmail,
+        type: 'login',
+      }).catch(() => ({ data: null }));
 
       const cooldownSeconds =
-        data && typeof data === 'object' && typeof data.cooldownSeconds === 'number'
-          ? data.cooldownSeconds
+        data && typeof data === 'object' && typeof (data as any).cooldownSeconds === 'number'
+          ? (data as any).cooldownSeconds
           : 60;
 
       setSentHint('验证码已发送');
@@ -116,15 +107,15 @@ export default function LoginPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/auth/login-or-register-email-code', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ channel: 'email', recipient: trimmedEmail, code: trimmedCode, type: 'login' }),
+      const res = await apiClient.post('/auth/login-or-register-by-code', {
+        channel: 'email',
+        recipient: trimmedEmail,
+        code: trimmedCode,
+        type: 'login',
       });
 
-      if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        setApiError(text || '登录失败，请稍后重试');
+      if (!res.data.ok) {
+        setApiError('登录失败，请稍后重试');
         return;
       }
 
